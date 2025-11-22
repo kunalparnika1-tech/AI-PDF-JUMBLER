@@ -1,72 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Student Seat Jumbler</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
   <style>
+    /* ---- GLOBAL LOOK ---- */
+    :root {
+      --violet:#6a11cb;
+      --blue:#2575fc;
+      --mint:#2af598;
+      --pink:#ff6fd8;
+    }
     body {
-      background: linear-gradient(135deg, #a1c4fd, #c2e9fb); /* brighter blue gradient */
-      color: #1a1a1a;
+      margin:0;
+      font-family:"Poppins",sans-serif;
+      background:linear-gradient(120deg,var(--violet),var(--blue),var(--mint),var(--pink));
+      background-size:400% 400%;
+      animation:shift 15s ease infinite;
+      color:#fff;
     }
-    header, main, footer {
-      margin-top: 2rem;
+    @keyframes shift {
+      0%{background-position:0% 50%;}
+      50%{background-position:100% 50%;}
+      100%{background-position:0% 50%;}
     }
-    nav {
-      background: #0077ff;
-      color: #fff;
+
+    nav,footer{
+      background:rgba(255,255,255,0.12);
+      backdrop-filter:blur(10px);
     }
-    nav a { color: #fff; }
-    .upload-section {
-      text-align: center;
-      padding: 2rem;
-      background: #ffffffcc;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      backdrop-filter: blur(6px);
+
+    main.container{
+      background:rgba(255,255,255,0.95);
+      color:#222;
+      border-radius:1rem;
+      box-shadow:0 10px 40px rgba(0,0,0,0.25);
+      padding:2rem;
+      margin-top:2rem;
+      animation:fadeIn .8s ease;
     }
-    table {
-      margin-top: 1.5rem;
-      width: 100%;
-      text-align: center;
-      border-radius: 10px;
-      background: #ffffffdd;
-      box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+    @keyframes fadeIn{
+      from{opacity:0;transform:translateY(20px);}
+      to{opacity:1;transform:translateY(0);}
     }
-    button {
-      background-color: #ff5722;
-      border: none;
-      color: white;
-      font-weight: bold;
-      transition: 0.2s ease;
+
+    h2,h3{
+      background:linear-gradient(90deg,var(--violet),var(--pink));
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
     }
-    button:hover {
-      background-color: #e64a19;
+
+    .upload-card{
+      background:linear-gradient(135deg,#fdfbfb,#ebedee);
+      border-radius:1rem;
+      padding:2rem;
+      text-align:center;
+      box-shadow:0 6px 25px rgba(0,0,0,0.1);
+      transition:.3s;
     }
-    .ad-container {
-      text-align: center;
-      margin: 2rem 0;
-      padding: 1rem;
-      background: #ffe0b2;
-      border-radius: 8px;
-      border: 1px solid #ffc107;
+    .upload-card:hover{transform:scale(1.02);}
+    button{
+      background:linear-gradient(90deg,var(--pink),var(--blue));
+      color:#fff;border:none;
+      border-radius:50px;
+      padding:.8rem 2rem;
+      font-weight:600;
+      transition:.3s;
     }
-    .ad-container h4 {
-      color: #6d4c41;
-      font-size: 0.9rem;
-      margin-bottom: 0.5rem;
+    button:hover{
+      transform:translateY(-2px);
+      box-shadow:0 4px 15px rgba(0,0,0,0.3);
     }
-    footer {
-      text-align: center;
-      margin-top: 3rem;
-      color: #333;
+
+    table{
+      margin-top:2rem;width:100%;border-radius:12px;
+      overflow:hidden;text-align:center;
+      background:#fefefe;
+      box-shadow:0 5px 25px rgba(0,0,0,0.08);
     }
-    footer small a { color: #0077ff; }
+    th{
+      background:linear-gradient(90deg,var(--blue),var(--mint));
+      color:#fff;
+    }
+    tr:nth-child(even){background:#f4f6ff;}
+
+    .ad-container{
+      text-align:center;margin:2rem 0;padding:1rem;
+      background:rgba(255,255,255,0.25);
+      border-radius:1rem;color:#111;
+      backdrop-filter:blur(4px);
+    }
+    .ad-box{
+      width:100%;height:100px;border-radius:8px;
+      background:linear-gradient(45deg,#c0c0c0,#a1a1a1);
+    }
+    footer{text-align:center;padding:2rem 0;}
+    footer a{color:#fff;text-decoration:underline;}
   </style>
 </head>
 <body>
-  <!-- NAVIGATION -->
+
+  <!-- NAV -->
   <nav class="container-fluid">
     <ul><li><strong>AI Student Seat Jumbler</strong></li></ul>
     <ul>
@@ -79,49 +115,47 @@
   <!-- TOP AD -->
   <div class="ad-container">
     <h4>Advertisement</h4>
-    <div style="width:100%;height:90px;background:#ffcc80;">Top Ad Banner</div>
+    <div class="ad-box">Top Banner</div>
   </div>
 
+  <!-- MAIN CONTENT -->
   <main class="container">
     <section>
       <hgroup>
-        <h2 style="color:#0d47a1;">AI-Powered Student Seat Jumbler</h2>
-        <h3 style="color:#1565c0;">Upload three class lists, choose benches, and jumble instantly</h3>
+        <h2>Smarter Seating, Simplified</h2>
+        <h3>Upload 2 or 3 class lists and let AI jumble seats</h3>
       </hgroup>
 
-      <div class="upload-section">
+      <div class="upload-card">
         <form id="uploadForm">
-          <input type="file" id="classA" accept=".pdf" required />
-          <input type="file" id="classB" accept=".pdf" required />
-          <input type="file" id="classC" accept=".pdf" required />
-          <input type="number" id="benchCount" placeholder="Number of benches" min="1" required />
-          <button type="submit">Jumble Seats</button>
+          <input type="file" id="classA" accept=".pdf" required>
+          <input type="file" id="classB" accept=".pdf" required>
+          <input type="file" id="classC" accept=".pdf">
+          <input type="number" id="benchCount" placeholder="Number of benches" min="1" required>
+          <button type="submit">✨ Jumble Seats</button>
         </form>
       </div>
 
-      <!-- MID AD -->
       <div class="ad-container">
         <h4>Advertisement</h4>
-        <div style="width:100%;height:250px;background:#ffcc80;">Mid-Page Ad</div>
+        <div class="ad-box" style="height:250px;">Mid-Page Ad</div>
       </div>
 
       <table id="resultTable" style="display:none;">
-        <thead style="background:#1565c0;color:white;">
-          <tr><th>Bench #</th><th>Class A Student</th><th>Class B Student</th><th>Class C Student</th></tr>
+        <thead>
+          <tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th><th>Seat 3 (optional)</th></tr>
         </thead>
         <tbody></tbody>
       </table>
     </section>
   </main>
 
- 
-
-  <!-- FOOTER -->
+  <!-- FOOTER + AD -->
   <footer class="container">
-    <small><a href="#">Terms</a> • <a href="#">Privacy</a></small>
+    <small>© 2025 AI Seat Jumbler • <a href="#">Terms</a> • <a href="#">Privacy</a></small>
     <div class="ad-container">
       <h4>Advertisement</h4>
-      <div style="width:100%;height:90px;background:#ffcc80;">Footer Ad</div>
+      <div class="ad-box">Footer Ad</div>
     </div>
   </footer>
 
@@ -129,13 +163,14 @@
     document.getElementById('uploadForm').addEventListener('submit', (e)=>{
       e.preventDefault();
       const benches=parseInt(document.getElementById('benchCount').value)||0;
+      const includeC=document.getElementById('classC').files.length>0;
 
-      // Demo student lists
+      // placeholder data
       const classA=['Alice','Brian','Cathy','David','Ella','Frank','Grace','Henry'];
       const classB=['Ivy','Jack','Kara','Leo','Mona','Nate','Olivia','Paul'];
-      const classC=['Quinn','Rita','Sam','Tina','Uma','Victor','Wendy','Xavier'];
+      const classC=['Quinn','Rita','Sam','Tina','Uma','Victor','Will','Zoe'];
 
-      const shuffle=arr=>arr.sort(()=>Math.random()-0.5);
+      const shuffle=a=>a.sort(()=>Math.random()-0.5);
       const A=shuffle([...classA]);
       const B=shuffle([...classB]);
       const C=shuffle([...classC]);
@@ -143,19 +178,16 @@
       const tbody=document.querySelector('#resultTable tbody');
       tbody.innerHTML='';
       for(let i=0;i<benches;i++){
-        const row=`<tr>
-                     <td><strong>${i+1}</strong></td>
-                     <td>${A[i%A.length]}</td>
-                     <td>${B[i%B.length]}</td>
-                     <td>${C[i%C.length]}</td>
-                   </tr>`;
-        tbody.insertAdjacentHTML('beforeend',row);
+        const seat3=includeC?`<td>${C[i%C.length]}</td>`:'<td>—</td>';
+        tbody.insertAdjacentHTML('beforeend',
+          `<tr><td>${i+1}</td><td>${A[i%A.length]}</td><td>${B[i%B.length]}</td>${seat3}</tr>`);
       }
       document.getElementById('resultTable').style.display='table';
+      window.scrollTo({top:document.getElementById('resultTable').offsetTop,behavior:'smooth'});
     });
   </script>
 
-  <!-- Optional: place your AdSense script below -->
+  <!-- Optional: your Google AdSense script -->
   <!--
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXX"
           crossorigin="anonymous"></script>
