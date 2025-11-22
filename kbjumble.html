@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Student Seat Jumbler</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+  <style>
+    body {
+      background: linear-gradient(135deg, #a1c4fd, #c2e9fb); /* brighter blue gradient */
+      color: #1a1a1a;
+    }
+    header, main, footer {
+      margin-top: 2rem;
+    }
+    nav {
+      background: #0077ff;
+      color: #fff;
+    }
+    nav a { color: #fff; }
+    .upload-section {
+      text-align: center;
+      padding: 2rem;
+      background: #ffffffcc;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      backdrop-filter: blur(6px);
+    }
+    table {
+      margin-top: 1.5rem;
+      width: 100%;
+      text-align: center;
+      border-radius: 10px;
+      background: #ffffffdd;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+    }
+    button {
+      background-color: #ff5722;
+      border: none;
+      color: white;
+      font-weight: bold;
+      transition: 0.2s ease;
+    }
+    button:hover {
+      background-color: #e64a19;
+    }
+    .ad-container {
+      text-align: center;
+      margin: 2rem 0;
+      padding: 1rem;
+      background: #ffe0b2;
+      border-radius: 8px;
+      border: 1px solid #ffc107;
+    }
+    .ad-container h4 {
+      color: #6d4c41;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      color: #333;
+    }
+    footer small a { color: #0077ff; }
+  </style>
+</head>
+<body>
+  <!-- NAVIGATION -->
+  <nav class="container-fluid">
+    <ul><li><strong>AI Student Seat Jumbler</strong></li></ul>
+    <ul>
+      <li><a href="#">Home</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" role="button">Login</a></li>
+    </ul>
+  </nav>
+
+  <!-- TOP AD -->
+  <div class="ad-container">
+    <h4>Advertisement</h4>
+    <div style="width:100%;height:90px;background:#ffcc80;">Top Ad Banner</div>
+  </div>
+
+  <main class="container">
+    <section>
+      <hgroup>
+        <h2 style="color:#0d47a1;">AI-Powered Student Seat Jumbler</h2>
+        <h3 style="color:#1565c0;">Upload three class lists, choose benches, and jumble instantly</h3>
+      </hgroup>
+
+      <div class="upload-section">
+        <form id="uploadForm">
+          <input type="file" id="classA" accept=".pdf" required />
+          <input type="file" id="classB" accept=".pdf" required />
+          <input type="file" id="classC" accept=".pdf" required />
+          <input type="number" id="benchCount" placeholder="Number of benches" min="1" required />
+          <button type="submit">Jumble Seats</button>
+        </form>
+      </div>
+
+      <!-- MID AD -->
+      <div class="ad-container">
+        <h4>Advertisement</h4>
+        <div style="width:100%;height:250px;background:#ffcc80;">Mid-Page Ad</div>
+      </div>
+
+      <table id="resultTable" style="display:none;">
+        <thead style="background:#1565c0;color:white;">
+          <tr><th>Bench #</th><th>Class A Student</th><th>Class B Student</th><th>Class C Student</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+ 
+
+  <!-- FOOTER -->
+  <footer class="container">
+    <small><a href="#">Terms</a> • <a href="#">Privacy</a></small>
+    <div class="ad-container">
+      <h4>Advertisement</h4>
+      <div style="width:100%;height:90px;background:#ffcc80;">Footer Ad</div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const benches=parseInt(document.getElementById('benchCount').value)||0;
+
+      // Demo student lists
+      const classA=['Alice','Brian','Cathy','David','Ella','Frank','Grace','Henry'];
+      const classB=['Ivy','Jack','Kara','Leo','Mona','Nate','Olivia','Paul'];
+      const classC=['Quinn','Rita','Sam','Tina','Uma','Victor','Wendy','Xavier'];
+
+      const shuffle=arr=>arr.sort(()=>Math.random()-0.5);
+      const A=shuffle([...classA]);
+      const B=shuffle([...classB]);
+      const C=shuffle([...classC]);
+
+      const tbody=document.querySelector('#resultTable tbody');
+      tbody.innerHTML='';
+      for(let i=0;i<benches;i++){
+        const row=`<tr>
+                     <td><strong>${i+1}</strong></td>
+                     <td>${A[i%A.length]}</td>
+                     <td>${B[i%B.length]}</td>
+                     <td>${C[i%C.length]}</td>
+                   </tr>`;
+        tbody.insertAdjacentHTML('beforeend',row);
+      }
+      document.getElementById('resultTable').style.display='table';
+    });
+  </script>
+
+  <!-- Optional: place your AdSense script below -->
+  <!--
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXX"
+          crossorigin="anonymous"></script>
+  -->
+</body>
+</html>
