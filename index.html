@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Student Seat Jumbler</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --violet:#6a11cb;
@@ -40,16 +42,23 @@
   }
   .upload-card{
     background:linear-gradient(135deg,#fdfbfb,#ebedee);
-    border-radius:1rem;padding:2rem;text-align:center;
+    border-radius:1rem;padding:2rem;
     box-shadow:0 6px 25px rgba(0,0,0,0.1);transition:.3s;
   }
-  .upload-card:hover{transform:scale(1.02);}
+  .upload-card:hover{transform:scale(1.01);}
+  .file-row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1rem;}
+  .file-row label{min-width:6.5rem;font-weight:600;margin:0;}
+  .file-row input[type=file]{flex:1;min-width:220px;margin:0;}
+  .file-status{font-size:.85rem;color:#444;flex-basis:100%;padding-left:6.5rem;}
+  .file-status.ok{color:#0a7a3d;font-weight:600;}
+  .file-status.err{color:#c0392b;font-weight:600;}
   button{
     background:linear-gradient(90deg,var(--pink),var(--blue));
     color:#fff;border:none;border-radius:50px;
     padding:.8rem 2rem;font-weight:600;transition:.3s;
   }
   button:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,0,0,0.3);}
+  button:disabled{opacity:.5;transform:none;box-shadow:none;cursor:not-allowed;}
   table{
     margin-top:2rem;width:100%;border-radius:12px;overflow:hidden;
     text-align:center;background:#fefefe;box-shadow:0 5px 25px rgba(0,0,0,0.08);
@@ -57,14 +66,24 @@
   th{background:linear-gradient(90deg,var(--blue),var(--mint));color:#fff;}
   tr:nth-child(even){background:#f4f6ff;}
   .toolbar{
-    display:flex;justify-content:space-between;align-items:center;
-    background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-bottom:1rem;
+    display:flex;justify-content:flex-end;gap:.6rem;align-items:center;
+    background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-top:1.5rem;
   }
   .toolbar button{padding:.4rem 1rem;}
-  .ad-container{text-align:center;margin:2rem 0;padding:1rem;background:rgba(255,255,255,0.25);border-radius:1rem;color:#111;backdrop-filter:blur(4px);}
-  .ad-box{width:100%;height:100px;border-radius:8px;background:linear-gradient(45deg,#c0c0c0,#a1a1a1);}
+  .names-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1.5rem;}
+  .names-preview article{margin:0;padding:1rem;}
+  .names-preview h5{margin:0 0 .5rem 0;}
+  .names-preview textarea{width:100%;min-height:180px;font-size:.85rem;resize:vertical;}
+  .names-count{font-size:.8rem;color:#555;}
   footer{text-align:center;padding:2rem 0;}
   footer a{color:#fff;text-decoration:underline;}
+  @media print{
+    body{background:#fff;animation:none;}
+    nav,footer,.upload-card,.toolbar,.names-preview,hgroup h3{display:none!important;}
+    main.container{box-shadow:none;margin:0;}
+    table{box-shadow:none;}
+    th{color:#000;background:#ddd;-webkit-print-color-adjust:exact;}
+  }
 </style>
 </head>
 <body>
@@ -74,101 +93,274 @@
   <ul>
     <li><a href="#">Dashboard</a></li>
     <li><a href="#">Reports</a></li>
-    <li><a href="#" role="button" id="loginBtn">Login</a></li>
   </ul>
 </nav>
-
-<div class="ad-container"><h4>Advertisement</h4><div class="ad-box">Top Banner</div></div>
 
 <main class="container">
   <section>
     <hgroup>
       <h2>Smarter Seating for Smarter Classrooms</h2>
-      <h3>Upload 2 or 3 class lists, pick your bench count, and export results</h3>
+      <h3>Upload 2 or 3 class lists — PDF or Excel — pick your bench count, and export results</h3>
     </hgroup>
 
     <div class="upload-card">
       <form id="uploadForm">
-        <input type="file" id="classA" accept=".pdf" required>
-        <input type="file" id="classB" accept=".pdf" required>
-        <input type="file" id="classC" accept=".pdf">
-        <input type="number" id="benchCount" placeholder="Number of benches" min="1" required>
-        <button type="submit">✨ Jumble Seats</button>
+        <div class="file-row">
+          <label for="classA">Class A</label>
+          <input type="file" id="classA" accept=".pdf,.xlsx,.xls,.csv,.txt" required>
+          <span class="file-status" id="statusA"></span>
+        </div>
+        <div class="file-row">
+          <label for="classB">Class B</label>
+          <input type="file" id="classB" accept=".pdf,.xlsx,.xls,.csv,.txt" required>
+          <span class="file-status" id="statusB"></span>
+        </div>
+        <div class="file-row">
+          <label for="classC">Class C <small>(optional)</small></label>
+          <input type="file" id="classC" accept=".pdf,.xlsx,.xls,.csv,.txt">
+          <span class="file-status" id="statusC"></span>
+        </div>
+        <div class="file-row">
+          <label for="benchCount">Benches</label>
+          <input type="number" id="benchCount" placeholder="Number of benches" min="1" required style="max-width:220px;margin:0;">
+        </div>
+        <div style="text-align:center;margin-top:1rem;">
+          <button type="submit" id="jumbleBtn">✨ Jumble Seats</button>
+        </div>
       </form>
     </div>
 
-    <div class="toolbar" id="tools" style="display:none;">
-      <button id="exportBtn">Export as CSV</button>
-      <button id="analyzeBtn">AI Pairing Analysis</button>
+    <div class="names-preview" id="namesPreview" style="display:none;">
+      <article><h5>Class A <span class="names-count" id="countA"></span></h5><textarea id="editA" spellcheck="false"></textarea></article>
+      <article><h5>Class B <span class="names-count" id="countB"></span></h5><textarea id="editB" spellcheck="false"></textarea></article>
+      <article id="cardC" style="display:none;"><h5>Class C <span class="names-count" id="countC"></span></h5><textarea id="editC" spellcheck="false"></textarea></article>
     </div>
 
     <table id="resultTable" style="display:none;">
-      <thead><tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th><th>Seat 3 (optional)</th></tr></thead>
+      <thead><tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th><th>Seat 3</th></tr></thead>
       <tbody></tbody>
     </table>
 
-    <div class="ad-container"><h4>Advertisement</h4><div class="ad-box" style="height:250px;">Mid-Page Ad</div></div>
+    <div class="toolbar" id="tools" style="display:none;">
+      <button id="reshuffleBtn">🔀 Re-Jumble</button>
+      <button id="exportBtn">⬇ Export CSV</button>
+      <button id="printBtn">🖨 Print / PDF</button>
+    </div>
   </section>
 </main>
 
 <footer class="container">
   <small>© 2025 AI Seat Jumbler • <a href="#">Terms</a> • <a href="#">Privacy</a></small>
-  <div class="ad-container"><h4>Advertisement</h4><div class="ad-box">Footer Ad</div></div>
 </footer>
 
 <script>
-/* --- basic simulated logic --- */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+/* ---------- name extraction ---------- */
+
+// Lines/cells that are clearly not student names (headers, numbering, etc.)
+const NOISE = /^(s\.?\s?no\.?|sno|sl\.?\s?no\.?|roll\s?no\.?|roll|name|names|student\s?names?|students?'?\s?names?|name\s?of\s?(the\s?)?students?|class|section|list|total|date|page\s?\d+|\d+[.)]?)$/i;
+
+function cleanNames(rawList){
+  const seen = new Set();
+  const out = [];
+  for (let raw of rawList){
+    let s = String(raw)
+      .replace(/^\s*\d+\s*[.)\-:]?\s*/,'')   // strip leading numbering "12."
+      .replace(/\s+/g,' ')
+      .trim();
+    if (!s || s.length < 2 || s.length > 60) continue;
+    if (NOISE.test(s)) continue;
+    if (!/[a-zA-Z-￿]{2}/.test(s)) continue; // must contain letters
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+async function extractFromPDF(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const lines = [];
+  for (let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    // group text items into lines by their y-coordinate
+    const rows = new Map();
+    for (const item of content.items){
+      const y = Math.round(item.transform[5]);
+      if (!rows.has(y)) rows.set(y, []);
+      rows.get(y).push(item);
+    }
+    [...rows.entries()]
+      .sort((a,b)=>b[0]-a[0])
+      .forEach(([,items])=>{
+        items.sort((a,b)=>a.transform[4]-b.transform[4]);
+        lines.push(items.map(i=>i.str).join(' '));
+      });
+  }
+  return cleanNames(lines);
+}
+
+async function extractFromExcel(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const cells = [];
+  for (const sheetName of wb.SheetNames){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
+    if (!rows.length) continue;
+    // pick the column with the most name-like text cells
+    const colCount = Math.max(...rows.map(r=>r.length));
+    let bestCol = 0, bestScore = -1;
+    for (let c = 0; c < colCount; c++){
+      let score = 0;
+      for (const r of rows){
+        const v = String(r[c] ?? '').trim();
+        if (v && isNaN(v) && !NOISE.test(v)) score++;
+      }
+      if (score > bestScore){ bestScore = score; bestCol = c; }
+    }
+    for (const r of rows) cells.push(String(r[bestCol] ?? ''));
+  }
+  return cleanNames(cells);
+}
+
+async function extractFromText(file){
+  const text = await file.text();
+  return cleanNames(text.split(/\r?\n|,/));
+}
+
+async function extractNames(file){
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'pdf') return extractFromPDF(file);
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return extractFromExcel(file);
+  return extractFromText(file);
+}
+
+/* ---------- per-file live status + preview ---------- */
+
+const classes = { A:[], B:[], C:[] };
+
+for (const k of ['A','B','C']){
+  document.getElementById('class'+k).addEventListener('change', async e=>{
+    const status = document.getElementById('status'+k);
+    const file = e.target.files[0];
+    if (!file){ status.textContent=''; classes[k]=[]; refreshPreview(); return; }
+    status.className = 'file-status';
+    status.textContent = '⏳ Reading ' + file.name + ' …';
+    try{
+      const names = await extractNames(file);
+      classes[k] = names;
+      if (names.length){
+        status.className = 'file-status ok';
+        status.textContent = `✅ ${names.length} students found in ${file.name}`;
+      } else {
+        status.className = 'file-status err';
+        status.textContent = `⚠ No names detected in ${file.name} — you can type them in the preview box below`;
+      }
+    }catch(err){
+      classes[k] = [];
+      status.className = 'file-status err';
+      status.textContent = '❌ Could not read ' + file.name + ' (' + err.message + ')';
+    }
+    refreshPreview();
+  });
+}
+
+function refreshPreview(){
+  const any = classes.A.length || classes.B.length || classes.C.length;
+  document.getElementById('namesPreview').style.display = any ? 'grid' : 'none';
+  for (const k of ['A','B','C']){
+    document.getElementById('edit'+k).value = classes[k].join('\n');
+    document.getElementById('count'+k).textContent = classes[k].length ? `(${classes[k].length})` : '';
+  }
+  document.getElementById('cardC').style.display =
+    (classes.C.length || document.getElementById('classC').files.length) ? '' : 'none';
+}
+
+// textareas are the source of truth at jumble time (teacher can fix names)
+function namesFromEditor(k){
+  return cleanNames(document.getElementById('edit'+k).value.split('\n'));
+}
+
+/* ---------- jumbling ---------- */
+
+function shuffle(arr){ // Fisher–Yates: unbiased, unlike sort(random)
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function renderJumble(){
+  const benches = parseInt(document.getElementById('benchCount').value) || 0;
+  if (benches < 1){ alert('Please enter the number of benches.'); return; }
+
+  const A = shuffle(namesFromEditor('A'));
+  const B = shuffle(namesFromEditor('B'));
+  const C = shuffle(namesFromEditor('C'));
+  if (!A.length || !B.length){
+    alert('Need at least Class A and Class B student lists. Upload files or type names in the preview boxes.');
+    return;
+  }
+
+  const total = A.length + B.length + C.length;
+  const seatsPerBench = C.length ? 3 : 2;
+  if (benches * seatsPerBench < total){
+    if (!confirm(`⚠ ${total} students but only ${benches} benches × ${seatsPerBench} seats = ${benches*seatsPerBench} seats.\nSome students will be left unseated. Continue?`)) return;
+  }
+
+  const tbody = document.querySelector('#resultTable tbody');
+  tbody.innerHTML = '';
+  for (let i = 0; i < benches; i++){
+    const s1 = A[i] ?? '—';
+    const s2 = B[i] ?? '—';
+    const s3 = C.length ? (C[i] ?? '—') : '—';
+    tbody.insertAdjacentHTML('beforeend',
+      `<tr><td>${i+1}</td><td>${s1}</td><td>${s2}</td><td>${s3}</td></tr>`);
+  }
+
+  const leftover = [
+    ...A.slice(benches).map(n=>n+' (A)'),
+    ...B.slice(benches).map(n=>n+' (B)'),
+    ...(C.length ? C.slice(benches).map(n=>n+' (C)') : [])
+  ];
+  if (leftover.length){
+    tbody.insertAdjacentHTML('beforeend',
+      `<tr><td colspan="4" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
+  }
+
+  document.getElementById('resultTable').style.display = 'table';
+  document.getElementById('tools').style.display = 'flex';
+  document.getElementById('resultTable').scrollIntoView({behavior:'smooth'});
+}
+
 document.getElementById('uploadForm').addEventListener('submit', e=>{
   e.preventDefault();
-  const benches=parseInt(document.getElementById('benchCount').value)||0;
-  const includeC=document.getElementById('classC').files.length>0;
-
-  // TODO: Replace with real PDF extraction (pdf.js or server API)
-  const classA=['Alice','Brian','Cathy','David','Ella','Frank','Grace','Henry'];
-  const classB=['Ivy','Jack','Kara','Leo','Mona','Nate','Olivia','Paul'];
-  const classC=['Quinn','Rita','Sam','Tina','Uma','Victor','Will','Zoe'];
-
-  const shuffle=a=>a.sort(()=>Math.random()-0.5);
-  const A=shuffle([...classA]);
-  const B=shuffle([...classB]);
-  const C=shuffle([...classC]);
-
-  const tbody=document.querySelector('#resultTable tbody');
-  tbody.innerHTML='';
-  for(let i=0;i<benches;i++){
-    const seat3=includeC?`<td>${C[i%C.length]}</td>`:'<td>—</td>';
-    tbody.insertAdjacentHTML('beforeend',
-      `<tr><td>${i+1}</td><td>${A[i%A.length]}</td><td>${B[i%B.length]}</td>${seat3}</tr>`);
-  }
-  document.getElementById('resultTable').style.display='table';
-  document.getElementById('tools').style.display='flex';
-  window.scrollTo({top:document.getElementById('resultTable').offsetTop,behavior:'smooth'});
+  renderJumble();
 });
+document.getElementById('reshuffleBtn').addEventListener('click', renderJumble);
 
-/* --- export feature --- */
-document.getElementById('exportBtn').addEventListener('click',()=>{
-  const rows=[...document.querySelectorAll('#resultTable tr')];
-  const csv=rows.map(r=>[...r.children].map(td=>td.textContent).join(',')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv'});
-  const link=document.createElement('a');
-  link.href=URL.createObjectURL(blob);
-  link.download='seating_chart.csv';
+/* ---------- export ---------- */
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const rows = [...document.querySelectorAll('#resultTable tr')];
+  const csv = rows.map(r=>[...r.children]
+    .map(td=>'"'+td.textContent.replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'seating_chart.csv';
   link.click();
+  URL.revokeObjectURL(link.href);
 });
 
-/* --- placeholder AI analysis --- */
-document.getElementById('analyzeBtn').addEventListener('click',()=>{
-  alert("🧠 AI Analysis: Balanced gender & even distribution achieved! (demo)\n\nTo add real AI, connect a backend that evaluates PDF data.");
-});
-
-/* --- login placeholder --- */
-document.getElementById('loginBtn').addEventListener('click',()=>{
-  alert("This is a placeholder for teacher login.\nConnect to Firebase Auth or Supabase for real accounts.");
-});
+document.getElementById('printBtn').addEventListener('click', ()=>window.print());
 </script>
-
-<!-- Optional: your Google AdSense script
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXX" crossorigin="anonymous"></script>
--->
 </body>
 </html>
