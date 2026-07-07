@@ -143,6 +143,7 @@
 
     <div class="toolbar" id="tools" style="display:none;">
       <button id="reshuffleBtn">🔀 Re-Jumble</button>
+      <button id="exportXlsxBtn">⬇ Export Excel</button>
       <button id="exportBtn">⬇ Export CSV</button>
       <button id="printBtn">🖨 Print / PDF</button>
     </div>
@@ -301,35 +302,40 @@ function renderJumble(){
   const benches = parseInt(document.getElementById('benchCount').value) || 0;
   if (benches < 1){ alert('Please enter the number of benches.'); return; }
 
-  const A = shuffle(namesFromEditor('A'));
-  const B = shuffle(namesFromEditor('B'));
-  const C = shuffle(namesFromEditor('C'));
-  if (!A.length || !B.length){
-    alert('Need at least Class A and Class B student lists. Upload files or type names in the preview boxes.');
+  // pools: one queue per class, pre-shuffled
+  const pools = [
+    {tag:'A', q: shuffle(namesFromEditor('A'))},
+    {tag:'B', q: shuffle(namesFromEditor('B'))},
+    {tag:'C', q: shuffle(namesFromEditor('C'))}
+  ].filter(p=>p.q.length);
+  if (pools.length < 2){
+    alert('Need at least two class lists. Upload files or type names in the preview boxes.');
     return;
   }
 
-  const total = A.length + B.length + C.length;
-  const seatsPerBench = C.length ? 3 : 2;
+  const seatsPerBench = pools.length;
+  const total = pools.reduce((n,p)=>n+p.q.length, 0);
   if (benches * seatsPerBench < total){
     if (!confirm(`⚠ ${total} students but only ${benches} benches × ${seatsPerBench} seats = ${benches*seatsPerBench} seats.\nSome students will be left unseated. Continue?`)) return;
   }
 
+  // Fill each bench from the classes with the most students remaining, one
+  // student per class per bench — so two classmates never share a bench,
+  // and unequal class sizes drain evenly instead of leaving one class pooled.
   const tbody = document.querySelector('#resultTable tbody');
   tbody.innerHTML = '';
   for (let i = 0; i < benches; i++){
-    const s1 = A[i] ?? '—';
-    const s2 = B[i] ?? '—';
-    const s3 = C.length ? (C[i] ?? '—') : '—';
+    const byRemaining = [...pools].sort((a,b)=>b.q.length-a.q.length);
+    const seats = [];
+    for (let s = 0; s < seatsPerBench; s++){
+      const p = byRemaining[s];
+      seats.push(p && p.q.length ? p.q.shift() : '—');
+    }
     tbody.insertAdjacentHTML('beforeend',
-      `<tr><td>${i+1}</td><td>${s1}</td><td>${s2}</td><td>${s3}</td></tr>`);
+      `<tr><td>${i+1}</td><td>${seats[0]}</td><td>${seats[1]}</td><td>${seats[2] ?? '—'}</td></tr>`);
   }
 
-  const leftover = [
-    ...A.slice(benches).map(n=>n+' (A)'),
-    ...B.slice(benches).map(n=>n+' (B)'),
-    ...(C.length ? C.slice(benches).map(n=>n+' (C)') : [])
-  ];
+  const leftover = pools.flatMap(p=>p.q.map(n=>`${n} (${p.tag})`));
   if (leftover.length){
     tbody.insertAdjacentHTML('beforeend',
       `<tr><td colspan="4" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
@@ -358,6 +364,11 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   link.download = 'seating_chart.csv';
   link.click();
   URL.revokeObjectURL(link.href);
+});
+
+document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
+  const wb = XLSX.utils.table_to_book(document.getElementById('resultTable'), {sheet:'Seating Chart'});
+  XLSX.writeFile(wb, 'seating_chart.xlsx');
 });
 
 document.getElementById('printBtn').addEventListener('click', ()=>window.print());
