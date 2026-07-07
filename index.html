@@ -50,6 +50,8 @@
   .file-row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1rem;}
   .file-row label{min-width:6.5rem;font-weight:600;margin:0;}
   .file-row input[type=file],.file-row input[type=text]{flex:1;min-width:220px;margin:0;}
+  .file-row input.stream-in{flex:0 0 150px;min-width:110px;font-weight:600;}
+  .stream-tag{display:inline-block;font-size:.68rem;font-weight:600;padding:.05rem .4rem;border-radius:10px;background:#eef2ff;color:#3949ab;margin-left:.3rem;vertical-align:middle;}
   .file-status{font-size:.85rem;color:#444;flex-basis:100%;padding-left:6.5rem;}
   .file-status.ok{color:#0a7a3d;font-weight:600;}
   .file-status.err{color:#c0392b;font-weight:600;}
@@ -99,6 +101,7 @@
     table{background:#1e2030;color:#e8e8ef;}
     tr:nth-child(even){background:#262a40;}
     tr.clash td{background:#4a1a1a !important;color:#ffb4b4;}
+    .stream-tag{background:#31355a;color:#aeb8ff;}
     .toolbar{background:rgba(30,32,48,0.85);}
     .names-count,.swap-hint{color:#99a;}
     .print-header p{color:#aab;}
@@ -157,18 +160,31 @@
           <label for="examTitle">Exam / Event</label>
           <input type="text" id="examTitle" placeholder="e.g. Half-Yearly Exam 2026 (optional)">
         </div>
+        <datalist id="streamList">
+          <option value="MPC">Maths, Physics, Chemistry</option>
+          <option value="BiPC">Biology, Physics, Chemistry</option>
+          <option value="MEC">Maths, Economics, Commerce</option>
+          <option value="CEC">Commerce, Economics, Civics</option>
+          <option value="HEC">History, Economics, Civics</option>
+          <option value="IP">Informatics Practices</option>
+          <option value="PE">Physical Education</option>
+          <option value="Psychology">Psychology</option>
+        </datalist>
         <div class="file-row">
-          <label for="classA">Class A</label>
+          <label for="classA">Group A</label>
+          <input type="text" id="streamA" list="streamList" class="stream-in" placeholder="Stream (e.g. MPC)">
           <input type="file" id="classA" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusA"></span>
         </div>
         <div class="file-row">
-          <label for="classB">Class B</label>
+          <label for="classB">Group B</label>
+          <input type="text" id="streamB" list="streamList" class="stream-in" placeholder="Stream (e.g. MEC)">
           <input type="file" id="classB" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusB"></span>
         </div>
         <div class="file-row">
-          <label for="classC">Class C <small>(optional)</small></label>
+          <label for="classC">Group C <small>(optional)</small></label>
+          <input type="text" id="streamC" list="streamList" class="stream-in" placeholder="Stream (e.g. CEC)">
           <input type="file" id="classC" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusC"></span>
         </div>
@@ -183,9 +199,9 @@
     </div>
 
     <div class="names-preview" id="namesPreview" style="display:none;">
-      <article><h5>Class A <span class="names-count" id="countA"></span></h5><textarea id="editA" spellcheck="false"></textarea></article>
-      <article id="cardB"><h5>Class B <span class="names-count" id="countB"></span></h5><textarea id="editB" spellcheck="false"></textarea></article>
-      <article id="cardC"><h5>Class C <span class="names-count" id="countC"></span></h5><textarea id="editC" spellcheck="false"></textarea></article>
+      <article><h5 id="headA">Group A <span class="names-count" id="countA"></span></h5><textarea id="editA" spellcheck="false"></textarea></article>
+      <article id="cardB"><h5 id="headB">Group B <span class="names-count" id="countB"></span></h5><textarea id="editB" spellcheck="false"></textarea></article>
+      <article id="cardC"><h5 id="headC">Group C <span class="names-count" id="countC"></span></h5><textarea id="editC" spellcheck="false"></textarea></article>
     </div>
 
     <div class="print-header" id="printHeader" style="display:none;">
@@ -317,12 +333,22 @@ async function extractNames(file){
 
 const STORE_KEY = 'jumbler-state-v1';
 
+// Stream/group label for a class tag — the teacher's typed stream (MPC, MEC…)
+// or a plain "Group A/B/C" fallback so charts always read sensibly.
+function streamLabel(tag){
+  const v = (document.getElementById('stream'+tag).value || '').trim();
+  return v || ('Group ' + tag);
+}
+
 function saveState(){
   try{
     localStorage.setItem(STORE_KEY, JSON.stringify({
       A: document.getElementById('editA').value,
       B: document.getElementById('editB').value,
       C: document.getElementById('editC').value,
+      sA: document.getElementById('streamA').value,
+      sB: document.getElementById('streamB').value,
+      sC: document.getElementById('streamC').value,
       bench: document.getElementById('benchCount').value,
       school: document.getElementById('schoolName').value,
       exam: document.getElementById('examTitle').value,
@@ -338,18 +364,29 @@ function restoreState(){
   document.getElementById('editA').value = s.A || '';
   document.getElementById('editB').value = s.B || '';
   document.getElementById('editC').value = s.C || '';
+  document.getElementById('streamA').value = s.sA || '';
+  document.getElementById('streamB').value = s.sB || '';
+  document.getElementById('streamC').value = s.sC || '';
   document.getElementById('benchCount').value = s.bench || '';
   document.getElementById('schoolName').value = s.school || '';
   document.getElementById('examTitle').value = s.exam || '';
-  window.currentMode = s.mode || 'mixed';
+  window.currentMode = s.mode || 'default';
   if (s.A || s.B || s.C) refreshPreview(true);
 }
 
-for (const id of ['editA','editB','editC','benchCount','schoolName','examTitle']){
+for (const id of ['editA','editB','editC','streamA','streamB','streamC','benchCount','schoolName','examTitle']){
   document.getElementById(id).addEventListener('input', ()=>{
     saveState();
     if (id.startsWith('edit')) updateCounts();
+    if (id.startsWith('stream')) updateHeaders();
   });
+}
+
+function updateHeaders(){
+  for (const k of ['A','B','C']){
+    const h = document.getElementById('head'+k);
+    h.firstChild.textContent = streamLabel(k) + ' ';
+  }
 }
 
 /* ---------- per-file live status + preview ---------- */
@@ -391,6 +428,7 @@ function refreshPreview(keepValues){
   const any = ['A','B','C'].some(k=>document.getElementById('edit'+k).value.trim());
   document.getElementById('namesPreview').style.display = any ? 'grid' : 'none';
   updateCounts();
+  updateHeaders();
 }
 
 function namesFromEditor(k){
@@ -408,6 +446,25 @@ function shuffle(arr){
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+// A seat holds a raw student name (data-name) + its class tag (data-cls); the
+// visible content is the name plus a small stream badge. Keeping name/cls in
+// data-attributes lets swap, clash-check and export stay accurate.
+function seatCellHTML(name, cls){
+  return `<td class="seat" draggable="true" data-cls="${cls}" data-name="${escapeHtml(name)}">${seatInner(name, cls)}</td>`;
+}
+function seatInner(name, cls){
+  if (!name || name === '—') return '—';
+  const tag = cls ? ` <span class="stream-tag">${escapeHtml(streamLabel(cls))}</span>` : '';
+  return escapeHtml(name) + tag;
+}
+function renderSeat(td){
+  td.innerHTML = seatInner(td.dataset.name, td.dataset.cls);
 }
 
 function renderJumble(){
@@ -438,22 +495,25 @@ function renderJumble(){
   const tbody = document.querySelector('#resultTable tbody');
   tbody.innerHTML = '';
 
+  const withTag = (arr,tag)=>arr.map(name=>({name, cls:tag}));
+
   if (window.currentMode === 'single'){
-    // Single class mode: jumble within all students together
-    const allStudents = shuffle([...A, ...B, ...C].filter(s=>s));
+    // Single-class mode: pool every student and jumble together, but keep each
+    // student's stream tag so the badge still shows where they came from.
+    const all = shuffle([...withTag(A,'A'), ...withTag(B,'B'), ...withTag(C,'C')]);
     for (let i = 0; i < benches; i++){
-      const s1 = allStudents[i*2] ?? '—';
-      const s2 = allStudents[i*2+1] ?? '—';
+      const s1 = all[i*2], s2 = all[i*2+1];
       tbody.insertAdjacentHTML('beforeend',
-        `<tr><td>${i+1}</td><td class="seat" draggable="true" data-cls="">${s1}</td><td class="seat" draggable="true" data-cls="">${s2}</td></tr>`);
+        `<tr><td>${i+1}</td>${seatCellHTML(s1?s1.name:'—', s1?s1.cls:'')}${seatCellHTML(s2?s2.name:'—', s2?s2.cls:'')}</tr>`);
     }
-    const unseated = allStudents.slice(benches * 2);
+    const unseated = all.slice(benches * 2);
     if (unseated.length){
       tbody.insertAdjacentHTML('beforeend',
-        `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${unseated.join(', ')}</td></tr>`);
+        `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${unseated.map(s=>escapeHtml(s.name)).join(', ')}</td></tr>`);
     }
   } else {
-    // Mixed: one from each class per bench
+    // Mixed mode: one student from each stream per bench — same-stream students
+    // never share a bench, so nobody can copy a paper they're both writing.
     const pools = [
       {tag:'A', q: shuffle([...A])},
       {tag:'B', q: shuffle([...B])},
@@ -467,20 +527,16 @@ function renderJumble(){
 
     for (let i = 0; i < benches; i++){
       const byRemaining = [...pools].sort((a,b)=>b.q.length-a.q.length);
-      const seats = [];
+      let html = '';
       for (let s = 0; s < 2; s++){
         const p = byRemaining[s];
-        if (p && p.q.length){
-          seats.push({name: p.q.shift(), cls: p.tag});
-        } else {
-          seats.push({name: '—', cls: ''});
-        }
+        if (p && p.q.length) html += seatCellHTML(p.q.shift(), p.tag);
+        else html += seatCellHTML('—', '');
       }
-      const html = seats.map(s=>`<td class="seat" draggable="true" data-cls="${s.cls}">${s.name}</td>`).join('');
       tbody.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td>${html}</tr>`);
     }
 
-    const leftover = pools.flatMap(p=>p.q.map(n=>`${n} (${p.tag})`));
+    const leftover = pools.flatMap(p=>p.q.map(n=>`${escapeHtml(n)} (${escapeHtml(streamLabel(p.tag))})`));
     if (leftover.length){
       tbody.insertAdjacentHTML('beforeend',
         `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
@@ -539,8 +595,10 @@ let selectedSeat = null;
 
 function swapSeats(a, b){
   if (a === b) return;
-  [a.textContent, b.textContent] = [b.textContent, a.textContent];
-  const c = a.dataset.cls; a.dataset.cls = b.dataset.cls; b.dataset.cls = c;
+  const an = a.dataset.name, ac = a.dataset.cls;
+  a.dataset.name = b.dataset.name; a.dataset.cls = b.dataset.cls;
+  b.dataset.name = an; b.dataset.cls = ac;
+  renderSeat(a); renderSeat(b);
   markClashes();
 }
 
@@ -548,7 +606,7 @@ function markClashes(){
   document.querySelectorAll('#resultTable tbody tr').forEach(tr=>{
     if (tr.classList.contains('unseated')) return;
     const seats = [...tr.querySelectorAll('td.seat')];
-    const cls = seats.filter(td=>td.textContent !== '—').map(td=>td.dataset.cls).filter(Boolean);
+    const cls = seats.filter(td=>td.dataset.name && td.dataset.name !== '—').map(td=>td.dataset.cls).filter(Boolean);
     if (window.currentMode === 'mixed'){
       tr.classList.toggle('clash', new Set(cls).size !== cls.length && cls.length > 0);
     }
@@ -589,10 +647,26 @@ table.addEventListener('drop', e=>{
 
 /* ---------- export ---------- */
 
+// Build a clean 2-D array from the chart. Seat cells become "Name (Stream)"
+// so the stream survives export instead of the badge concatenating oddly.
+function chartToRows(){
+  const out = [];
+  document.querySelectorAll('#resultTable thead tr, #resultTable tbody tr').forEach(tr=>{
+    out.push([...tr.children].map(td=>{
+      if (td.classList.contains('seat')){
+        const name = td.dataset.name || '—';
+        if (!name || name === '—') return '—';
+        return td.dataset.cls ? `${name} (${streamLabel(td.dataset.cls)})` : name;
+      }
+      return td.textContent;
+    }));
+  });
+  return out;
+}
+
 document.getElementById('exportBtn').addEventListener('click', ()=>{
-  const rows = [...document.querySelectorAll('#resultTable tr')];
-  const csv = rows.map(r=>[...r.children]
-    .map(td=>'"'+td.textContent.replace(/"/g,'""')+'"').join(',')).join('\n');
+  const csv = chartToRows()
+    .map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -602,7 +676,8 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
 });
 
 document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
-  const wb = XLSX.utils.table_to_book(document.getElementById('resultTable'), {sheet:'Seating Chart'});
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chartToRows()), 'Seating Chart');
   XLSX.writeFile(wb, 'seating_chart.xlsx');
 });
 
