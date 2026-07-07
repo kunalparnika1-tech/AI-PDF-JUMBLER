@@ -28,6 +28,7 @@
     100%{background-position:0% 50%;}
   }
   nav,footer{background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);}
+  nav ul{display:flex;justify-content:space-between;align-items:center;width:100%;}
   main.container{
     background:rgba(255,255,255,0.97);
     color:#222;border-radius:1rem;
@@ -59,6 +60,7 @@
   }
   button:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,0,0,0.3);}
   button:disabled{opacity:.5;transform:none;box-shadow:none;cursor:not-allowed;}
+  button.toggle-btn{background:linear-gradient(90deg,var(--mint),var(--blue));padding:.5rem 1rem;font-size:.9rem;}
   table{
     margin-top:1rem;width:100%;border-radius:12px;overflow:hidden;
     text-align:center;background:#fefefe;box-shadow:0 5px 25px rgba(0,0,0,0.08);
@@ -69,10 +71,12 @@
   td.seat.selected{outline:3px solid var(--pink);outline-offset:-3px;border-radius:6px;}
   tr.clash td{background:#ffd6d6 !important;color:#8b0000;}
   .swap-hint{font-size:.8rem;color:#666;margin-top:.5rem;text-align:center;}
+  .mode-badge{display:inline-block;background:#2575fc;color:#fff;padding:.2rem .8rem;border-radius:20px;font-size:.75rem;font-weight:600;margin-left:.5rem;}
   .toolbar{
-    display:flex;justify-content:flex-end;gap:.6rem;align-items:center;flex-wrap:wrap;
-    background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-top:1.5rem;
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
+    background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-top:1.5rem;gap:.6rem;
   }
+  .toolbar-right{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;}
   .toolbar button{padding:.4rem 1rem;}
   .names-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1.5rem;}
   .names-preview article{margin:0;padding:1rem;}
@@ -106,7 +110,8 @@
     .upload-card{padding:1rem;}
     .file-row label{min-width:100%;}
     .file-status{padding-left:0;}
-    .toolbar{justify-content:center;}
+    .toolbar{justify-content:center;flex-direction:column;}
+    .toolbar-right{width:100%;justify-content:center;}
     table{font-size:.85rem;}
     nav ul li a{padding:.3rem;}
   }
@@ -114,7 +119,7 @@
   /* ---- print ---- */
   @media print{
     body{background:#fff;animation:none;}
-    nav,footer,.upload-card,.toolbar,.names-preview,.swap-hint,hgroup{display:none!important;}
+    nav,footer,.upload-card,.toolbar,.names-preview,.swap-hint,.mode-badge,hgroup{display:none!important;}
     main.container{box-shadow:none;margin:0;padding:0;}
     .print-header h2{-webkit-text-fill-color:#000;background:none;color:#000;}
     .print-header p{color:#000;}
@@ -127,10 +132,11 @@
 <body>
 
 <nav class="container-fluid">
-  <ul><li><strong>AI Student Seat Jumbler</strong></li></ul>
   <ul>
-    <li><a href="#">Dashboard</a></li>
-    <li><a href="#">Reports</a></li>
+    <li><strong>AI Student Seat Jumbler</strong></li>
+    <li style="display:flex;gap:1rem;align-items:center;">
+      <span id="modeSpan"></span>
+    </li>
   </ul>
 </nav>
 
@@ -138,7 +144,7 @@
   <section>
     <hgroup>
       <h2>Smarter Seating for Smarter Classrooms</h2>
-      <h3>Upload 2 or 3 class lists — PDF or Excel — pick your bench count, and export results</h3>
+      <h3>Upload 1, 2, or 3 class lists — PDF or Excel — and let AI jumble seats</h3>
     </hgroup>
 
     <div class="upload-card">
@@ -178,7 +184,7 @@
 
     <div class="names-preview" id="namesPreview" style="display:none;">
       <article><h5>Class A <span class="names-count" id="countA"></span></h5><textarea id="editA" spellcheck="false"></textarea></article>
-      <article><h5>Class B <span class="names-count" id="countB"></span></h5><textarea id="editB" spellcheck="false"></textarea></article>
+      <article id="cardB"><h5>Class B <span class="names-count" id="countB"></span></h5><textarea id="editB" spellcheck="false"></textarea></article>
       <article id="cardC"><h5>Class C <span class="names-count" id="countC"></span></h5><textarea id="editC" spellcheck="false"></textarea></article>
     </div>
 
@@ -189,16 +195,20 @@
     </div>
 
     <table id="resultTable" style="display:none;">
-      <thead><tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th><th>Seat 3</th></tr></thead>
+      <thead><tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th></tr></thead>
       <tbody></tbody>
     </table>
-    <p class="swap-hint" id="swapHint" style="display:none;">💡 Tap one student, then tap another to swap their seats (or drag &amp; drop). A red bench means two students from the same class.</p>
+    <p class="swap-hint" id="swapHint" style="display:none;">💡 Tap one student, then tap another to swap their seats (or drag &amp; drop).</p>
 
     <div class="toolbar" id="tools" style="display:none;">
-      <button id="reshuffleBtn">🔀 Re-Jumble</button>
-      <button id="exportXlsxBtn">⬇ Export Excel</button>
-      <button id="exportBtn">⬇ Export CSV</button>
-      <button id="printBtn">🖨 Print / PDF</button>
+      <div style="flex:1;"></div>
+      <div class="toolbar-right">
+        <button id="toggleModeBtn" class="toggle-btn" style="display:none;">🔄 Same Class</button>
+        <button id="reshuffleBtn">🔀 Re-Jumble</button>
+        <button id="exportXlsxBtn">⬇ Export Excel</button>
+        <button id="exportBtn">⬇ Export CSV</button>
+        <button id="printBtn">🖨 Print</button>
+      </div>
     </div>
   </section>
 </main>
@@ -213,7 +223,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 /* ---------- name extraction ---------- */
 
-// Lines/cells that are clearly not student names (headers, numbering, etc.)
 const NOISE = /^(s\.?\s?no\.?|sno|sl\.?\s?no\.?|roll\s?no\.?|roll|name|names|student\s?names?|students?'?\s?names?|name\s?of\s?(the\s?)?students?|class|section|list|total|date|page\s?\d+|\d+[.)]?)$/i;
 
 function cleanNames(rawList){
@@ -221,12 +230,12 @@ function cleanNames(rawList){
   const out = [];
   for (let raw of rawList){
     let s = String(raw)
-      .replace(/^\s*\d+\s*[.)\-:]?\s*/,'')   // strip leading numbering "12."
+      .replace(/^\s*\d+\s*[.)\-:]?\s*/,'')
       .replace(/\s+/g,' ')
       .trim();
     if (!s || s.length < 2 || s.length > 60) continue;
     if (NOISE.test(s)) continue;
-    if (!/[a-zA-Z-￿]{2}/.test(s)) continue; // must contain letters
+    if (!/[a-zA-Z-￿]{2}/.test(s)) continue;
     const key = s.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -242,7 +251,6 @@ async function extractFromPDF(file){
   for (let p = 1; p <= pdf.numPages; p++){
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    // group text items into lines by their y-coordinate
     const rows = new Map();
     for (const item of content.items){
       const y = Math.round(item.transform[5]);
@@ -267,8 +275,6 @@ async function extractFromExcel(file){
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
     if (!rows.length) continue;
     const colCount = Math.max(...rows.map(r=>r.length));
-
-    // name column = the one with the most name-like text cells
     let bestCol = 0, bestScore = -1;
     for (let c = 0; c < colCount; c++){
       let score = 0;
@@ -278,14 +284,10 @@ async function extractFromExcel(file){
       }
       if (score > bestScore){ bestScore = score; bestCol = c; }
     }
-
-    // roll-number column: only trusted when a header explicitly says "roll"
-    // (a numeric-majority guess would confuse S.No columns with roll numbers)
     let rollCol = -1;
     (rows[0] || []).forEach((h,c)=>{
       if (c !== bestCol && /roll/i.test(String(h))) rollCol = c;
     });
-
     for (const r of rows){
       const name = String(r[bestCol] ?? '').trim();
       const roll = rollCol >= 0 ? String(r[rollCol] ?? '').trim() : '';
@@ -311,7 +313,7 @@ async function extractNames(file){
   return extractFromText(file);
 }
 
-/* ---------- save / restore (localStorage) ---------- */
+/* ---------- save / restore ---------- */
 
 const STORE_KEY = 'jumbler-state-v1';
 
@@ -323,9 +325,10 @@ function saveState(){
       C: document.getElementById('editC').value,
       bench: document.getElementById('benchCount').value,
       school: document.getElementById('schoolName').value,
-      exam: document.getElementById('examTitle').value
+      exam: document.getElementById('examTitle').value,
+      mode: window.currentMode || 'mixed'
     }));
-  }catch(e){ /* storage full or blocked — non-fatal */ }
+  }catch(e){ }
 }
 
 function restoreState(){
@@ -338,6 +341,7 @@ function restoreState(){
   document.getElementById('benchCount').value = s.bench || '';
   document.getElementById('schoolName').value = s.school || '';
   document.getElementById('examTitle').value = s.exam || '';
+  window.currentMode = s.mode || 'mixed';
   if (s.A || s.B || s.C) refreshPreview(true);
 }
 
@@ -362,14 +366,14 @@ for (const k of ['A','B','C']){
       document.getElementById('edit'+k).value = names.join('\n');
       if (names.length){
         status.className = 'file-status ok';
-        status.textContent = `✅ ${names.length} students found in ${file.name}`;
+        status.textContent = `✅ ${names.length} students found`;
       } else {
         status.className = 'file-status err';
-        status.textContent = `⚠ No names detected in ${file.name} — you can type them in the preview box below`;
+        status.textContent = `⚠ No names detected`;
       }
     }catch(err){
       status.className = 'file-status err';
-      status.textContent = '❌ Could not read ' + file.name + ' (' + err.message + ')';
+      status.textContent = '❌ Error: ' + err.message;
     }
     refreshPreview();
     saveState();
@@ -389,14 +393,15 @@ function refreshPreview(keepValues){
   updateCounts();
 }
 
-// textareas are the source of truth at jumble time (teacher can fix names)
 function namesFromEditor(k){
   return cleanNames(document.getElementById('edit'+k).value.split('\n'));
 }
 
-/* ---------- jumbling ---------- */
+/* ---------- jumbling logic ---------- */
 
-function shuffle(arr){ // Fisher–Yates: unbiased, unlike sort(random)
+window.currentMode = 'default';
+
+function shuffle(arr){
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
@@ -409,49 +414,81 @@ function renderJumble(){
   const benches = parseInt(document.getElementById('benchCount').value) || 0;
   if (benches < 1){ alert('Please enter the number of benches.'); return; }
 
-  // pools: one queue per class, pre-shuffled
-  const pools = [
-    {tag:'A', q: shuffle(namesFromEditor('A'))},
-    {tag:'B', q: shuffle(namesFromEditor('B'))},
-    {tag:'C', q: shuffle(namesFromEditor('C'))}
-  ].filter(p=>p.q.length);
-  if (pools.length < 2){
-    alert('Need at least two class lists. Upload files or type names in the preview boxes.');
+  const A = namesFromEditor('A');
+  const B = namesFromEditor('B');
+  const C = namesFromEditor('C');
+
+  const classCount = [A, B, C].filter(c=>c.length).length;
+  if (classCount === 0){
+    alert('Upload at least one class list.');
     return;
   }
 
-  const seatsPerBench = pools.length;
-  const total = pools.reduce((n,p)=>n+p.q.length, 0);
-  if (benches * seatsPerBench < total){
-    if (!confirm(`⚠ ${total} students but only ${benches} benches × ${seatsPerBench} seats = ${benches*seatsPerBench} seats.\nSome students will be left unseated. Continue?`)) return;
+  // Show/hide toggle based on mode eligibility
+  const toggleBtn = document.getElementById('toggleModeBtn');
+  if (classCount === 1){
+    toggleBtn.style.display = 'none';
+    window.currentMode = 'single';
+  } else {
+    toggleBtn.style.display = '';
+    // With multi-class, allow both modes; default to mixed on first load
+    if (!window.currentMode || window.currentMode === 'default') window.currentMode = 'mixed';
   }
 
-  // Fill each bench from the classes with the most students remaining, one
-  // student per class per bench — so two classmates never share a bench,
-  // and unequal class sizes drain evenly instead of leaving one class pooled.
   const tbody = document.querySelector('#resultTable tbody');
   tbody.innerHTML = '';
-  for (let i = 0; i < benches; i++){
-    const byRemaining = [...pools].sort((a,b)=>b.q.length-a.q.length);
-    let cells = '';
-    for (let s = 0; s < 3; s++){
-      const p = byRemaining[s];
-      if (s < seatsPerBench && p && p.q.length){
-        cells += `<td class="seat" draggable="true" data-cls="${p.tag}">${p.q.shift()}</td>`;
-      } else {
-        cells += `<td class="seat" draggable="true" data-cls="">—</td>`;
-      }
+
+  if (window.currentMode === 'single'){
+    // Single class mode: jumble within all students together
+    const allStudents = shuffle([...A, ...B, ...C].filter(s=>s));
+    for (let i = 0; i < benches; i++){
+      const s1 = allStudents[i*2] ?? '—';
+      const s2 = allStudents[i*2+1] ?? '—';
+      tbody.insertAdjacentHTML('beforeend',
+        `<tr><td>${i+1}</td><td class="seat" draggable="true" data-cls="">${s1}</td><td class="seat" draggable="true" data-cls="">${s2}</td></tr>`);
     }
-    tbody.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td>${cells}</tr>`);
+    const unseated = allStudents.slice(benches * 2);
+    if (unseated.length){
+      tbody.insertAdjacentHTML('beforeend',
+        `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${unseated.join(', ')}</td></tr>`);
+    }
+  } else {
+    // Mixed: one from each class per bench
+    const pools = [
+      {tag:'A', q: shuffle([...A])},
+      {tag:'B', q: shuffle([...B])},
+      {tag:'C', q: shuffle([...C])}
+    ].filter(p=>p.q.length);
+
+    const total = pools.reduce((n,p)=>n+p.q.length, 0);
+    if (benches * 2 < total){
+      if (!confirm(`⚠ ${total} students but only ${benches} benches × 2 seats = ${benches*2} seats.\nContinue?`)) return;
+    }
+
+    for (let i = 0; i < benches; i++){
+      const byRemaining = [...pools].sort((a,b)=>b.q.length-a.q.length);
+      const seats = [];
+      for (let s = 0; s < 2; s++){
+        const p = byRemaining[s];
+        if (p && p.q.length){
+          seats.push({name: p.q.shift(), cls: p.tag});
+        } else {
+          seats.push({name: '—', cls: ''});
+        }
+      }
+      const html = seats.map(s=>`<td class="seat" draggable="true" data-cls="${s.cls}">${s.name}</td>`).join('');
+      tbody.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td>${html}</tr>`);
+    }
+
+    const leftover = pools.flatMap(p=>p.q.map(n=>`${n} (${p.tag})`));
+    if (leftover.length){
+      tbody.insertAdjacentHTML('beforeend',
+        `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
+    }
   }
 
-  const leftover = pools.flatMap(p=>p.q.map(n=>`${n} (${p.tag})`));
-  if (leftover.length){
-    tbody.insertAdjacentHTML('beforeend',
-      `<tr class="unseated"><td colspan="4" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
-  }
+  markClashes();
 
-  // printable header
   const school = document.getElementById('schoolName').value.trim();
   const exam = document.getElementById('examTitle').value.trim();
   document.getElementById('phSchool').textContent = school;
@@ -461,16 +498,39 @@ function renderJumble(){
   document.getElementById('printHeader').style.display = (school || exam) ? '' : 'none';
 
   document.getElementById('resultTable').style.display = 'table';
-  document.getElementById('swapHint').style.display = '';
+  document.getElementById('swapHint').style.display = window.currentMode === 'mixed' ? '' : 'none';
   document.getElementById('tools').style.display = 'flex';
+  updateModeDisplay();
   document.getElementById('resultTable').scrollIntoView({behavior:'smooth'});
   saveState();
+}
+
+function updateModeDisplay(){
+  const span = document.getElementById('modeSpan');
+  if (window.currentMode === 'single'){
+    span.innerHTML = '<span class="mode-badge">📌 Single Class</span>';
+  } else if (window.currentMode === 'mixed'){
+    span.innerHTML = '<span class="mode-badge">🔀 Mixed Classes</span>';
+  } else {
+    span.innerHTML = '';
+  }
+}
+
+function isValidMode(){
+  return window.currentMode === 'single' || window.currentMode === 'mixed';
 }
 
 document.getElementById('uploadForm').addEventListener('submit', e=>{
   e.preventDefault();
   renderJumble();
 });
+
+document.getElementById('toggleModeBtn').addEventListener('click', ()=>{
+  window.currentMode = window.currentMode === 'mixed' ? 'single' : 'mixed';
+  saveState();
+  renderJumble();
+});
+
 document.getElementById('reshuffleBtn').addEventListener('click', renderJumble);
 
 /* ---------- manual swap: tap-tap or drag & drop ---------- */
@@ -487,11 +547,11 @@ function swapSeats(a, b){
 function markClashes(){
   document.querySelectorAll('#resultTable tbody tr').forEach(tr=>{
     if (tr.classList.contains('unseated')) return;
-    const cls = [...tr.querySelectorAll('td.seat')]
-      .filter(td=>td.textContent !== '—')
-      .map(td=>td.dataset.cls)
-      .filter(Boolean);
-    tr.classList.toggle('clash', new Set(cls).size !== cls.length);
+    const seats = [...tr.querySelectorAll('td.seat')];
+    const cls = seats.filter(td=>td.textContent !== '—').map(td=>td.dataset.cls).filter(Boolean);
+    if (window.currentMode === 'mixed'){
+      tr.classList.toggle('clash', new Set(cls).size !== cls.length && cls.length > 0);
+    }
   });
 }
 
@@ -499,7 +559,7 @@ const table = document.getElementById('resultTable');
 
 table.addEventListener('click', e=>{
   const td = e.target.closest('td.seat');
-  if (!td) return;
+  if (!td || window.currentMode !== 'mixed') return;
   if (!selectedSeat){
     selectedSeat = td;
     td.classList.add('selected');
@@ -512,7 +572,7 @@ table.addEventListener('click', e=>{
 
 table.addEventListener('dragstart', e=>{
   const td = e.target.closest('td.seat');
-  if (!td){ e.preventDefault(); return; }
+  if (!td || window.currentMode !== 'mixed'){ e.preventDefault(); return; }
   selectedSeat && selectedSeat.classList.remove('selected');
   selectedSeat = null;
   e.dataTransfer.effectAllowed = 'move';
