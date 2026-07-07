@@ -52,6 +52,23 @@
   .ai-reco{display:inline-block;font-size:.65rem;font-weight:700;background:var(--violet);color:#fff;
     padding:.05rem .45rem;border-radius:10px;margin-left:.4rem;vertical-align:middle;}
 
+  /* ask-basis modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(10,10,25,0.55);backdrop-filter:blur(3px);
+    display:flex;align-items:center;justify-content:center;z-index:100;animation:fadeIn .25s ease;}
+  .modal-box{background:#fff;color:#222;border-radius:1rem;max-width:560px;width:92%;
+    padding:1.5rem 1.8rem;box-shadow:0 20px 60px rgba(0,0,0,0.4);max-height:85vh;overflow-y:auto;}
+  .modal-box h4{margin:0 0 .3rem 0;background:linear-gradient(90deg,var(--violet),var(--blue));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .modal-box p{font-size:.88rem;color:#444;margin:.2rem 0 1rem 0;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1rem;}
+  .modal-actions button{padding:.5rem 1.4rem;}
+  .modal-actions .ghost{background:#e8e8f2;color:#444;}
+  @media (prefers-color-scheme: dark){
+    .modal-box{background:#20233a;color:#e8e8ef;}
+    .modal-box p{color:#bbc;}
+    .modal-actions .ghost{background:#33365a;color:#ccd;}
+  }
+
   table{margin-top:1rem;width:100%;border-radius:12px;overflow:hidden;text-align:center;
     background:#fefefe;box-shadow:0 5px 25px rgba(0,0,0,0.08);}
   th{background:linear-gradient(90deg,var(--blue),var(--mint));color:#fff;}
@@ -215,6 +232,18 @@
     </div>
   </section>
 </main>
+
+<div class="modal-overlay" id="basisModal" style="display:none;">
+  <div class="modal-box">
+    <h4>🧠 On what basis should I jumble?</h4>
+    <p id="basisModalIntro"></p>
+    <div id="basisModalOptions"></div>
+    <div class="modal-actions">
+      <button type="button" class="ghost" id="basisCancelBtn">Cancel</button>
+      <button type="button" id="basisConfirmBtn">✨ Jumble</button>
+    </div>
+  </div>
+</div>
 
 <footer class="container">
   <small>© 2025 AI Seat Jumbler • <a href="#">Terms</a> • <a href="#">Privacy</a></small>
@@ -481,17 +510,11 @@ function detectCriteria(){
 
 function groupsWithNames(){ return ['A','B','C'].filter(k=>namesFromEditor(k).length); }
 
-function renderAIPanel(){
-  const panel = document.getElementById('aiPanel');
-  const anyData = groupsWithNames().length > 0;
-  if (!anyData){ panel.style.display='none'; return; }
-  panel.style.display = '';
-
+// One source of truth for "how could we jumble?" — used by the AI panel
+// and by the ask-me-first modal.
+function buildBasisOptions(){
   const {criteria, total} = detectCriteria();
-  const opts = document.getElementById('aiOptions');
   const groups = groupsWithNames();
-
-  // Build the option list: detected criteria first, then classic-by-group.
   const options = [];
   criteria.forEach(c=>{
     const preview = c.values.slice(0,6).join(', ') + (c.values.length>6 ? ', …' : '');
@@ -502,9 +525,28 @@ function renderAIPanel(){
   options.push({id:'group', title:'Classic — one from each uploaded group',
     vals: groups.length>1 ? groupLabels.join(', ') : 'only one group uploaded — jumbles within it',
     key:'group'});
-
-  // Recommendation: best-scoring criterion if any, else classic.
   const recoId = criteria.length ? 'attr:'+criteria[0].key : 'group';
+  return {options, recoId, criteria, total, groups};
+}
+
+function optionHTML(o, currentId, recoId, radioName){
+  const sel = o.id === currentId ? ' sel' : '';
+  const checked = o.id === currentId ? 'checked' : '';
+  const reco = o.id === recoId ? '<span class="ai-reco">RECOMMENDED</span>' : '';
+  return `<label class="ai-opt${sel}" data-id="${o.id}">
+    <input type="radio" name="${radioName}" value="${o.id}" ${checked}>
+    <span><span class="ai-title">${o.title}${reco}</span><span class="ai-vals">${o.vals}</span></span>
+  </label>`;
+}
+
+function renderAIPanel(){
+  const panel = document.getElementById('aiPanel');
+  const anyData = groupsWithNames().length > 0;
+  if (!anyData){ panel.style.display='none'; return; }
+  panel.style.display = '';
+
+  const {options, recoId, criteria, total, groups} = buildBasisOptions();
+  const opts = document.getElementById('aiOptions');
 
   // Until the teacher explicitly picks a basis, follow the recommendation.
   const validIds = new Set(options.map(o=>o.id));
@@ -525,16 +567,45 @@ function renderAIPanel(){
       : `I found one plain list with no stream / language columns, so I’ll simply shuffle everyone within it.`;
   }
 
-  opts.innerHTML = options.map(o=>{
-    const sel = o.id === currentId ? ' sel' : '';
-    const checked = o.id === currentId ? 'checked' : '';
-    const reco = o.id === recoId ? '<span class="ai-reco">RECOMMENDED</span>' : '';
-    return `<label class="ai-opt${sel}" data-id="${o.id}">
-      <input type="radio" name="basis" value="${o.id}" ${checked}>
-      <span><span class="ai-title">${o.title}${reco}</span><span class="ai-vals">${o.vals}</span></span>
-    </label>`;
-  }).join('');
+  opts.innerHTML = options.map(o=>optionHTML(o, currentId, recoId, 'basis')).join('');
 }
+
+/* ---------- ask-me-first modal ---------- */
+
+function openBasisModal(){
+  const {options, recoId, total} = buildBasisOptions();
+  const currentId = window.jumbleBasis === 'group' ? 'group' : 'attr:'+window.jumbleBasis;
+  const startId = options.some(o=>o.id===currentId) && window._basisUserChosen ? currentId : recoId;
+  document.getElementById('basisModalIntro').innerHTML =
+    `I read <strong>${total}</strong> students and found more than one way to jumble them. `
+    + `Pick the basis — students sharing it will never sit together.`;
+  document.getElementById('basisModalOptions').innerHTML =
+    options.map(o=>optionHTML(o, startId, recoId, 'modalBasis')).join('');
+  document.getElementById('basisModal').style.display = 'flex';
+}
+
+document.getElementById('basisModalOptions').addEventListener('change', e=>{
+  if (e.target.name !== 'modalBasis') return;
+  document.querySelectorAll('#basisModalOptions .ai-opt')
+    .forEach(el=>el.classList.toggle('sel', el.dataset.id===e.target.value));
+});
+
+document.getElementById('basisConfirmBtn').addEventListener('click', ()=>{
+  const picked = document.querySelector('#basisModalOptions input[name=modalBasis]:checked');
+  if (picked){
+    window._basisUserChosen = true;
+    window.jumbleBasis = picked.value === 'group' ? 'group' : picked.value.slice(5);
+  }
+  document.getElementById('basisModal').style.display = 'none';
+  saveState(); renderAIPanel(); renderJumble();
+});
+
+document.getElementById('basisCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('basisModal').style.display = 'none';
+});
+document.getElementById('basisModal').addEventListener('click', e=>{
+  if (e.target.id === 'basisModal') document.getElementById('basisModal').style.display = 'none';
+});
 
 document.getElementById('aiOptions').addEventListener('change', e=>{
   if (e.target.name !== 'basis') return;
@@ -688,7 +759,14 @@ function updateModeDisplay(){
   tb.textContent = window.currentMode==='mixed' ? '🔄 Jumble within one list' : '🔀 Mix by ' + basisLabel();
 }
 
-document.getElementById('uploadForm').addEventListener('submit', e=>{ e.preventDefault(); renderJumble(); });
+document.getElementById('uploadForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  if (groupsWithNames().length === 0){ alert('Upload at least one class list.'); return; }
+  // If the teacher hasn't picked a basis yet and there is a real choice, ask first.
+  const {options} = buildBasisOptions();
+  if (!window._basisUserChosen && options.length > 1) openBasisModal();
+  else renderJumble();
+});
 document.getElementById('reshuffleBtn').addEventListener('click', renderJumble);
 document.getElementById('toggleModeBtn').addEventListener('click', ()=>{
   window.currentMode = window.currentMode==='mixed' ? 'single' : 'mixed';
