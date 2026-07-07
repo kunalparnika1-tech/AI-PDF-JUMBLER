@@ -8,44 +8,19 @@
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-  :root {
-    --violet:#6a11cb;
-    --blue:#2575fc;
-    --mint:#2af598;
-    --pink:#ff6fd8;
-  }
-  body {
-    margin:0;
-    font-family:"Poppins",sans-serif;
+  :root{--violet:#6a11cb;--blue:#2575fc;--mint:#2af598;--pink:#ff6fd8;}
+  body{margin:0;font-family:"Poppins",sans-serif;
     background:linear-gradient(120deg,var(--violet),var(--blue),var(--mint),var(--pink));
-    background-size:400% 400%;
-    animation:shift 18s ease infinite;
-    color:#fff;
-  }
-  @keyframes shift {
-    0%{background-position:0% 50%;}
-    50%{background-position:100% 50%;}
-    100%{background-position:0% 50%;}
-  }
+    background-size:400% 400%;animation:shift 18s ease infinite;color:#fff;}
+  @keyframes shift{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
   nav,footer{background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);}
   nav ul{display:flex;justify-content:space-between;align-items:center;width:100%;}
-  main.container{
-    background:rgba(255,255,255,0.97);
-    color:#222;border-radius:1rem;
-    box-shadow:0 10px 40px rgba(0,0,0,0.25);
-    padding:2rem;margin-top:2rem;margin-bottom:3rem;
-    animation:fadeIn .8s ease;
-  }
+  main.container{background:rgba(255,255,255,0.97);color:#222;border-radius:1rem;
+    box-shadow:0 10px 40px rgba(0,0,0,0.25);padding:2rem;margin-top:2rem;margin-bottom:3rem;animation:fadeIn .8s ease;}
   @keyframes fadeIn{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
-  h2,h3{
-    background:linear-gradient(90deg,var(--violet),var(--pink));
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  }
-  .upload-card{
-    background:linear-gradient(135deg,#fdfbfb,#ebedee);
-    border-radius:1rem;padding:2rem;
-    box-shadow:0 6px 25px rgba(0,0,0,0.1);transition:.3s;
-  }
+  h2,h3{background:linear-gradient(90deg,var(--violet),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .upload-card{background:linear-gradient(135deg,#fdfbfb,#ebedee);border-radius:1rem;padding:2rem;
+    box-shadow:0 6px 25px rgba(0,0,0,0.1);transition:.3s;}
   .upload-card:hover{transform:scale(1.01);}
   .file-row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1rem;}
   .file-row label{min-width:6.5rem;font-weight:600;margin:0;}
@@ -55,18 +30,30 @@
   .file-status{font-size:.85rem;color:#444;flex-basis:100%;padding-left:6.5rem;}
   .file-status.ok{color:#0a7a3d;font-weight:600;}
   .file-status.err{color:#c0392b;font-weight:600;}
-  button{
-    background:linear-gradient(90deg,var(--pink),var(--blue));
-    color:#fff;border:none;border-radius:50px;
-    padding:.8rem 2rem;font-weight:600;transition:.3s;
-  }
+  button{background:linear-gradient(90deg,var(--pink),var(--blue));color:#fff;border:none;border-radius:50px;
+    padding:.8rem 2rem;font-weight:600;transition:.3s;}
   button:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,0,0,0.3);}
   button:disabled{opacity:.5;transform:none;box-shadow:none;cursor:not-allowed;}
   button.toggle-btn{background:linear-gradient(90deg,var(--mint),var(--blue));padding:.5rem 1rem;font-size:.9rem;}
-  table{
-    margin-top:1rem;width:100%;border-radius:12px;overflow:hidden;
-    text-align:center;background:#fefefe;box-shadow:0 5px 25px rgba(0,0,0,0.08);
-  }
+
+  /* AI analysis panel */
+  .ai-panel{margin-top:1.5rem;padding:1.2rem 1.5rem;border-radius:1rem;
+    background:linear-gradient(135deg,#f3e9ff,#e9f0ff);border:1px solid #d8c5ff;color:#222;}
+  .ai-panel h4{margin:0 0 .4rem 0;background:linear-gradient(90deg,var(--violet),var(--blue));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .ai-panel p{margin:.2rem 0 .8rem 0;font-size:.9rem;color:#333;}
+  .ai-opt{display:flex;align-items:flex-start;gap:.6rem;padding:.55rem .7rem;border-radius:.6rem;
+    background:rgba(255,255,255,0.7);margin-bottom:.5rem;cursor:pointer;border:2px solid transparent;transition:.2s;}
+  .ai-opt:hover{background:rgba(255,255,255,0.95);}
+  .ai-opt.sel{border-color:var(--violet);background:#fff;}
+  .ai-opt input{margin-top:.25rem;}
+  .ai-opt .ai-title{font-weight:600;}
+  .ai-opt .ai-vals{font-size:.78rem;color:#555;margin-top:.15rem;}
+  .ai-reco{display:inline-block;font-size:.65rem;font-weight:700;background:var(--violet);color:#fff;
+    padding:.05rem .45rem;border-radius:10px;margin-left:.4rem;vertical-align:middle;}
+
+  table{margin-top:1rem;width:100%;border-radius:12px;overflow:hidden;text-align:center;
+    background:#fefefe;box-shadow:0 5px 25px rgba(0,0,0,0.08);}
   th{background:linear-gradient(90deg,var(--blue),var(--mint));color:#fff;}
   tr:nth-child(even){background:#f4f6ff;}
   td.seat{cursor:pointer;user-select:none;}
@@ -74,10 +61,8 @@
   tr.clash td{background:#ffd6d6 !important;color:#8b0000;}
   .swap-hint{font-size:.8rem;color:#666;margin-top:.5rem;text-align:center;}
   .mode-badge{display:inline-block;background:#2575fc;color:#fff;padding:.2rem .8rem;border-radius:20px;font-size:.75rem;font-weight:600;margin-left:.5rem;}
-  .toolbar{
-    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
-    background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-top:1.5rem;gap:.6rem;
-  }
+  .toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
+    background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-top:1.5rem;gap:.6rem;}
   .toolbar-right{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;}
   .toolbar button{padding:.4rem 1rem;}
   .names-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1.5rem;}
@@ -91,13 +76,15 @@
   footer{text-align:center;padding:2rem 0;}
   footer a{color:#fff;text-decoration:underline;}
 
-  /* ---- dark mode ---- */
   @media (prefers-color-scheme: dark){
     main.container{background:rgba(24,26,40,0.97);color:#e8e8ef;}
     .upload-card{background:linear-gradient(135deg,#23253a,#1a1c2c);}
-    .file-status{color:#aab;}
-    .file-status.ok{color:#4ade80;}
-    .file-status.err{color:#f87171;}
+    .file-status{color:#aab;}.file-status.ok{color:#4ade80;}.file-status.err{color:#f87171;}
+    .ai-panel{background:linear-gradient(135deg,#241a3a,#1a2036);border-color:#4a3a6a;color:#e8e8ef;}
+    .ai-panel p{color:#bbc;}
+    .ai-opt{background:rgba(255,255,255,0.06);}.ai-opt:hover{background:rgba(255,255,255,0.12);}
+    .ai-opt.sel{background:rgba(255,255,255,0.14);}
+    .ai-opt .ai-vals{color:#99a;}
     table{background:#1e2030;color:#e8e8ef;}
     tr:nth-child(even){background:#262a40;}
     tr.clash td{background:#4a1a1a !important;color:#ffb4b4;}
@@ -106,8 +93,6 @@
     .names-count,.swap-hint{color:#99a;}
     .print-header p{color:#aab;}
   }
-
-  /* ---- mobile ---- */
   @media (max-width:640px){
     main.container{padding:1rem;margin-top:1rem;}
     .upload-card{padding:1rem;}
@@ -118,11 +103,9 @@
     table{font-size:.85rem;}
     nav ul li a{padding:.3rem;}
   }
-
-  /* ---- print ---- */
   @media print{
     body{background:#fff;animation:none;}
-    nav,footer,.upload-card,.toolbar,.names-preview,.swap-hint,.mode-badge,hgroup{display:none!important;}
+    nav,footer,.upload-card,.ai-panel,.names-preview,.swap-hint,.mode-badge,hgroup,.toolbar{display:none!important;}
     main.container{box-shadow:none;margin:0;padding:0;}
     .print-header h2{-webkit-text-fill-color:#000;background:none;color:#000;}
     .print-header p{color:#000;}
@@ -137,9 +120,7 @@
 <nav class="container-fluid">
   <ul>
     <li><strong>AI Student Seat Jumbler</strong></li>
-    <li style="display:flex;gap:1rem;align-items:center;">
-      <span id="modeSpan"></span>
-    </li>
+    <li style="display:flex;gap:1rem;align-items:center;"><span id="modeSpan"></span></li>
   </ul>
 </nav>
 
@@ -147,7 +128,7 @@
   <section>
     <hgroup>
       <h2>Smarter Seating for Smarter Classrooms</h2>
-      <h3>Upload 1, 2, or 3 class lists — PDF or Excel — and let AI jumble seats</h3>
+      <h3>Upload class lists — the AI reads them, figures out the safest way to jumble, and lets you choose</h3>
     </hgroup>
 
     <div class="upload-card">
@@ -172,19 +153,19 @@
         </datalist>
         <div class="file-row">
           <label for="classA">Group A</label>
-          <input type="text" id="streamA" list="streamList" class="stream-in" placeholder="Stream (e.g. MPC)">
+          <input type="text" id="streamA" list="streamList" class="stream-in" placeholder="Stream (optional)">
           <input type="file" id="classA" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusA"></span>
         </div>
         <div class="file-row">
           <label for="classB">Group B</label>
-          <input type="text" id="streamB" list="streamList" class="stream-in" placeholder="Stream (e.g. MEC)">
+          <input type="text" id="streamB" list="streamList" class="stream-in" placeholder="Stream (optional)">
           <input type="file" id="classB" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusB"></span>
         </div>
         <div class="file-row">
           <label for="classC">Group C <small>(optional)</small></label>
-          <input type="text" id="streamC" list="streamList" class="stream-in" placeholder="Stream (e.g. CEC)">
+          <input type="text" id="streamC" list="streamList" class="stream-in" placeholder="Stream (optional)">
           <input type="file" id="classC" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusC"></span>
         </div>
@@ -196,6 +177,12 @@
           <button type="submit" id="jumbleBtn">✨ Jumble Seats</button>
         </div>
       </form>
+    </div>
+
+    <div class="ai-panel" id="aiPanel" style="display:none;">
+      <h4>🧠 AI Analysis</h4>
+      <p id="aiSummary"></p>
+      <div id="aiOptions"></div>
     </div>
 
     <div class="names-preview" id="namesPreview" style="display:none;">
@@ -214,12 +201,12 @@
       <thead><tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th></tr></thead>
       <tbody></tbody>
     </table>
-    <p class="swap-hint" id="swapHint" style="display:none;">💡 Tap one student, then tap another to swap their seats (or drag &amp; drop).</p>
+    <p class="swap-hint" id="swapHint" style="display:none;">💡 Tap one student, then tap another to swap their seats (or drag &amp; drop). A red bench = two students who’d write the same paper.</p>
 
     <div class="toolbar" id="tools" style="display:none;">
       <div style="flex:1;"></div>
       <div class="toolbar-right">
-        <button id="toggleModeBtn" class="toggle-btn" style="display:none;">🔄 Same Class</button>
+        <button id="toggleModeBtn" class="toggle-btn" style="display:none;">🔄 Jumble within one group</button>
         <button id="reshuffleBtn">🔀 Re-Jumble</button>
         <button id="exportXlsxBtn">⬇ Export Excel</button>
         <button id="exportBtn">⬇ Export CSV</button>
@@ -237,25 +224,24 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
-/* ---------- name extraction ---------- */
+/* ================= name / column extraction ================= */
 
 const NOISE = /^(s\.?\s?no\.?|sno|sl\.?\s?no\.?|roll\s?no\.?|roll|name|names|student\s?names?|students?'?\s?names?|name\s?of\s?(the\s?)?students?|class|section|list|total|date|page\s?\d+|\d+[.)]?)$/i;
 
+// Common Indian second languages — used to recognise a "2nd language" column
+// even when its header is blank or oddly named.
+const LANGS = /^(sanskrit|hindi|telugu|tamil|urdu|french|german|arabic|kannada|malayalam|marathi|bengali|gujarati|punjabi|odia|assamese|spanish|english)$/i;
+
 function cleanNames(rawList){
-  const seen = new Set();
-  const out = [];
+  const seen = new Set(), out = [];
   for (let raw of rawList){
-    let s = String(raw)
-      .replace(/^\s*\d+\s*[.)\-:]?\s*/,'')
-      .replace(/\s+/g,' ')
-      .trim();
+    let s = String(raw).replace(/^\s*\d+\s*[.)\-:]?\s*/,'').replace(/\s+/g,' ').trim();
     if (!s || s.length < 2 || s.length > 60) continue;
     if (NOISE.test(s)) continue;
     if (!/[a-zA-Z-￿]{2}/.test(s)) continue;
     const key = s.toLowerCase();
     if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(s);
+    seen.add(key); out.push(s);
   }
   return out;
 }
@@ -273,68 +259,90 @@ async function extractFromPDF(file){
       if (!rows.has(y)) rows.set(y, []);
       rows.get(y).push(item);
     }
-    [...rows.entries()]
-      .sort((a,b)=>b[0]-a[0])
-      .forEach(([,items])=>{
-        items.sort((a,b)=>a.transform[4]-b.transform[4]);
-        lines.push(items.map(i=>i.str).join(' '));
-      });
+    [...rows.entries()].sort((a,b)=>b[0]-a[0]).forEach(([,items])=>{
+      items.sort((a,b)=>a.transform[4]-b.transform[4]);
+      lines.push(items.map(i=>i.str).join(' '));
+    });
   }
   return cleanNames(lines);
 }
 
-async function extractFromExcel(file){
+async function extractFromText(file){
+  return cleanNames((await file.text()).split(/\r?\n|,/));
+}
+
+// Rich Excel read: name + roll + every other labelled column as an attribute,
+// so the AI can later offer "jumble by Stream / 2nd Language / Section / …".
+async function extractExcelRich(file){
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:'array'});
-  const cells = [];
+  const records = [], names = [];
   for (const sheetName of wb.SheetNames){
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
     if (!rows.length) continue;
+    const header = (rows[0] || []).map(h=>String(h).trim());
     const colCount = Math.max(...rows.map(r=>r.length));
-    let bestCol = 0, bestScore = -1;
-    for (let c = 0; c < colCount; c++){
-      let score = 0;
-      for (const r of rows){
-        const v = String(r[c] ?? '').trim();
-        if (v && isNaN(v) && !NOISE.test(v)) score++;
+
+    // name column: prefer an explicit "name" header; otherwise the column with
+    // the most text-like AND mostly-unique cells (names differ, streams repeat).
+    let bestCol = header.findIndex(h=>/name/i.test(h) && !/roll|number|user/i.test(h));
+    if (bestCol < 0){
+      bestCol = 0; let bestScore = -1;
+      for (let c = 0; c < colCount; c++){
+        const vals = rows.slice(1).map(r=>String(r[c] ?? '').trim());
+        const textCount = vals.filter(x=>x && isNaN(x) && !NOISE.test(x)).length;
+        const distinct = new Set(vals.filter(Boolean)).size;
+        const score = textCount + distinct * 0.5;   // reward uniqueness
+        if (score > bestScore){ bestScore = score; bestCol = c; }
       }
-      if (score > bestScore){ bestScore = score; bestCol = c; }
     }
+    // roll column by header
     let rollCol = -1;
-    (rows[0] || []).forEach((h,c)=>{
-      if (c !== bestCol && /roll/i.test(String(h))) rollCol = c;
-    });
-    for (const r of rows){
+    header.forEach((h,c)=>{ if (c !== bestCol && /roll/i.test(h)) rollCol = c; });
+
+    // remaining labelled columns become attributes (skip serial-no columns)
+    const attrCols = [];
+    for (let c = 0; c < colCount; c++){
+      if (c === bestCol || c === rollCol) continue;
+      const h = header[c] || '';
+      if (/^(s\.?\s?no\.?|sno|sl\.?\s?no\.?)$/i.test(h)) continue;
+      attrCols.push({c, key: h || ('Column ' + (c+1))});
+    }
+
+    for (let i = 1; i < rows.length; i++){
+      const r = rows[i];
       const name = String(r[bestCol] ?? '').trim();
+      if (!name || NOISE.test(name) || !/[a-zA-Z]{2}/.test(name)) continue;
       const roll = rollCol >= 0 ? String(r[rollCol] ?? '').trim() : '';
-      if (name && roll && !NOISE.test(name) && /^[\w\/-]{1,12}$/.test(roll) && !/roll/i.test(roll)){
-        cells.push(`${name} (${roll})`);
-      } else {
-        cells.push(name);
+      const attrs = {};
+      for (const {c,key} of attrCols){
+        const v = String(r[c] ?? '').trim();
+        if (v) attrs[key] = v;
       }
+      const display = (roll && /^[\w\/-]{1,12}$/.test(roll) && !/roll/i.test(roll)) ? `${name} (${roll})` : name;
+      names.push(display);
+      records.push({name: display, plain: name, attrs});
     }
   }
-  return cleanNames(cells);
+  return {names: cleanNames(names), records};
 }
 
-async function extractFromText(file){
-  const text = await file.text();
-  return cleanNames(text.split(/\r?\n|,/));
-}
-
-async function extractNames(file){
+async function extractAll(file){
   const ext = file.name.split('.').pop().toLowerCase();
-  if (ext === 'pdf') return extractFromPDF(file);
-  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return extractFromExcel(file);
-  return extractFromText(file);
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return extractExcelRich(file);
+  if (ext === 'pdf') return {names: await extractFromPDF(file), records: []};
+  return {names: await extractFromText(file), records: []};
 }
+// kept for backward compatibility / quick lookups
+async function extractNames(file){ return (await extractAll(file)).names; }
 
-/* ---------- save / restore ---------- */
+/* ================= state ================= */
 
 const STORE_KEY = 'jumbler-state-v1';
+window.groupRecords = {A:[], B:[], C:[]};   // rich records per uploaded group
+window.jumbleBasis  = 'group';              // 'group' (classic) or an attribute key
+window.currentMode  = 'default';            // 'mixed' | 'single' | 'default'
 
-// Stream/group label for a class tag — the teacher's typed stream (MPC, MEC…)
-// or a plain "Group A/B/C" fallback so charts always read sensibly.
 function streamLabel(tag){
   const v = (document.getElementById('stream'+tag).value || '').trim();
   return v || ('Group ' + tag);
@@ -343,78 +351,73 @@ function streamLabel(tag){
 function saveState(){
   try{
     localStorage.setItem(STORE_KEY, JSON.stringify({
-      A: document.getElementById('editA').value,
-      B: document.getElementById('editB').value,
-      C: document.getElementById('editC').value,
-      sA: document.getElementById('streamA').value,
-      sB: document.getElementById('streamB').value,
-      sC: document.getElementById('streamC').value,
-      bench: document.getElementById('benchCount').value,
-      school: document.getElementById('schoolName').value,
-      exam: document.getElementById('examTitle').value,
-      mode: window.currentMode || 'mixed'
+      A:v('editA'), B:v('editB'), C:v('editC'),
+      sA:v('streamA'), sB:v('streamB'), sC:v('streamC'),
+      bench:v('benchCount'), school:v('schoolName'), exam:v('examTitle'),
+      mode: window.currentMode, basis: window.jumbleBasis, basisChosen: !!window._basisUserChosen,
+      records: window.groupRecords
     }));
-  }catch(e){ }
+  }catch(e){}
 }
+function v(id){ return document.getElementById(id).value; }
 
 function restoreState(){
-  let s;
-  try{ s = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){ return; }
+  let s; try{ s = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){ return; }
   if (!s) return;
-  document.getElementById('editA').value = s.A || '';
-  document.getElementById('editB').value = s.B || '';
-  document.getElementById('editC').value = s.C || '';
-  document.getElementById('streamA').value = s.sA || '';
-  document.getElementById('streamB').value = s.sB || '';
-  document.getElementById('streamC').value = s.sC || '';
+  ['A','B','C'].forEach(k=>{ document.getElementById('edit'+k).value = s[k] || ''; });
+  ['A','B','C'].forEach(k=>{ document.getElementById('stream'+k).value = s['s'+k] || ''; });
   document.getElementById('benchCount').value = s.bench || '';
   document.getElementById('schoolName').value = s.school || '';
   document.getElementById('examTitle').value = s.exam || '';
   window.currentMode = s.mode || 'default';
-  if (s.A || s.B || s.C) refreshPreview(true);
+  window.jumbleBasis = s.basis || 'group';
+  window._basisUserChosen = !!s.basisChosen;
+  window.groupRecords = s.records || {A:[],B:[],C:[]};
+  if (s.A || s.B || s.C){ refreshPreview(); renderAIPanel(); }
 }
 
 for (const id of ['editA','editB','editC','streamA','streamB','streamC','benchCount','schoolName','examTitle']){
   document.getElementById(id).addEventListener('input', ()=>{
     saveState();
-    if (id.startsWith('edit')) updateCounts();
-    if (id.startsWith('stream')) updateHeaders();
+    if (id.startsWith('edit')){ updateCounts(); renderAIPanel(); }
+    if (id.startsWith('stream')){ updateHeaders(); renderAIPanel(); }
   });
 }
 
-function updateHeaders(){
-  for (const k of ['A','B','C']){
-    const h = document.getElementById('head'+k);
-    h.firstChild.textContent = streamLabel(k) + ' ';
-  }
-}
-
-/* ---------- per-file live status + preview ---------- */
+/* ================= upload handling ================= */
 
 for (const k of ['A','B','C']){
   document.getElementById('class'+k).addEventListener('change', async e=>{
     const status = document.getElementById('status'+k);
     const file = e.target.files[0];
-    if (!file){ status.textContent=''; return; }
+    if (!file){ status.textContent=''; window.groupRecords[k]=[]; refreshPreview(); renderAIPanel(); saveState(); return; }
     status.className = 'file-status';
     status.textContent = '⏳ Reading ' + file.name + ' …';
     try{
-      const names = await extractNames(file);
+      const {names, records} = await extractAll(file);
       document.getElementById('edit'+k).value = names.join('\n');
+      window.groupRecords[k] = records;
       if (names.length){
         status.className = 'file-status ok';
-        status.textContent = `✅ ${names.length} students found`;
+        const extras = detectAttrKeys(records);
+        status.textContent = `✅ ${names.length} students${extras.length ? ' • columns: ' + extras.join(', ') : ''}`;
       } else {
         status.className = 'file-status err';
-        status.textContent = `⚠ No names detected`;
+        status.textContent = '⚠ No names detected';
       }
     }catch(err){
+      window.groupRecords[k] = [];
       status.className = 'file-status err';
       status.textContent = '❌ Error: ' + err.message;
     }
-    refreshPreview();
-    saveState();
+    refreshPreview(); renderAIPanel(); saveState();
   });
+}
+
+function detectAttrKeys(records){
+  const keys = new Set();
+  for (const r of records) for (const k of Object.keys(r.attrs)) keys.add(k);
+  return [...keys];
 }
 
 function updateCounts(){
@@ -423,139 +426,254 @@ function updateCounts(){
     document.getElementById('count'+k).textContent = n ? `(${n})` : '';
   }
 }
-
-function refreshPreview(keepValues){
+function updateHeaders(){
+  for (const k of ['A','B','C']) document.getElementById('head'+k).firstChild.textContent = streamLabel(k) + ' ';
+}
+function refreshPreview(){
   const any = ['A','B','C'].some(k=>document.getElementById('edit'+k).value.trim());
   document.getElementById('namesPreview').style.display = any ? 'grid' : 'none';
-  updateCounts();
-  updateHeaders();
+  updateCounts(); updateHeaders();
+}
+function namesFromEditor(k){ return cleanNames(document.getElementById('edit'+k).value.split('\n')); }
+
+/* ================= the "AI": detect jumbling criteria ================= */
+
+// Look across everything the teacher uploaded and work out which attributes
+// actually distinguish students — those are the valid ways to jumble.
+function detectCriteria(){
+  const keyVals = new Map();   // key -> Map(value -> count)
+  let total = 0;
+  for (const k of ['A','B','C']){
+    for (const rec of (window.groupRecords[k] || [])){
+      total++;
+      for (const [key,val] of Object.entries(rec.attrs)){
+        if (!keyVals.has(key)) keyVals.set(key, new Map());
+        const m = keyVals.get(key);
+        m.set(val, (m.get(val)||0)+1);
+      }
+    }
+  }
+  const criteria = [];
+  for (const [key,valMap] of keyVals){
+    const distinct = valMap.size;
+    const withVal = [...valMap.values()].reduce((a,b)=>a+b,0);
+    const coverage = total ? withVal/total : 0;
+    if (distinct < 2 || distinct > 12 || coverage < 0.4) continue; // not a useful split
+
+    const vals = [...valMap.keys()];
+    const langShare = vals.filter(x=>LANGS.test(x)).length / vals.length;
+    let label = key;
+    if (langShare >= 0.5 && !/lang/i.test(key)) label = '2nd Language';
+
+    // score: exam-relevant name + balanced distribution + reasonable spread
+    let score = 0;
+    if (/stream|group|section|lang|medium|subject|elective|second|paper/i.test(key) || langShare>=0.5) score += 100;
+    const counts = [...valMap.values()];
+    const max = Math.max(...counts), sum = counts.reduce((a,b)=>a+b,0);
+    score += (1 - max/sum) * 50;
+    score += Math.min(distinct, 5);
+
+    criteria.push({key, label, values: vals, counts: valMap, coverage, score});
+  }
+  criteria.sort((a,b)=>b.score-a.score);
+  return {criteria, total};
 }
 
-function namesFromEditor(k){
-  return cleanNames(document.getElementById('edit'+k).value.split('\n'));
+function groupsWithNames(){ return ['A','B','C'].filter(k=>namesFromEditor(k).length); }
+
+function renderAIPanel(){
+  const panel = document.getElementById('aiPanel');
+  const anyData = groupsWithNames().length > 0;
+  if (!anyData){ panel.style.display='none'; return; }
+  panel.style.display = '';
+
+  const {criteria, total} = detectCriteria();
+  const opts = document.getElementById('aiOptions');
+  const groups = groupsWithNames();
+
+  // Build the option list: detected criteria first, then classic-by-group.
+  const options = [];
+  criteria.forEach(c=>{
+    const preview = c.values.slice(0,6).join(', ') + (c.values.length>6 ? ', …' : '');
+    options.push({id:'attr:'+c.key, title:'Jumble by ' + c.label,
+      vals:`${c.values.length} groups — ${preview}`, key:c.key});
+  });
+  const groupLabels = groups.map(streamLabel);
+  options.push({id:'group', title:'Classic — one from each uploaded group',
+    vals: groups.length>1 ? groupLabels.join(', ') : 'only one group uploaded — jumbles within it',
+    key:'group'});
+
+  // Recommendation: best-scoring criterion if any, else classic.
+  const recoId = criteria.length ? 'attr:'+criteria[0].key : 'group';
+
+  // Until the teacher explicitly picks a basis, follow the recommendation.
+  const validIds = new Set(options.map(o=>o.id));
+  let currentId = window.jumbleBasis === 'group' ? 'group' : 'attr:'+window.jumbleBasis;
+  if (!window._basisUserChosen || !validIds.has(currentId)) currentId = recoId;
+  window.jumbleBasis = currentId === 'group' ? 'group' : currentId.slice(5);
+
+  // Summary line — the AI explaining what it found and what it recommends.
+  const summary = document.getElementById('aiSummary');
+  if (criteria.length){
+    const reco = criteria[0];
+    summary.innerHTML = `I read <strong>${total}</strong> students and found these ways to jumble them. `
+      + `I recommend <strong>${reco.label}</strong> — that keeps students writing the same `
+      + `${reco.label.toLowerCase()} paper off the same bench. Pick a different basis if you like.`;
+  } else {
+    summary.innerHTML = groups.length>1
+      ? `Your files have no extra columns like stream or second language, so I’ll jumble by the <strong>${groups.length} groups</strong> you uploaded (one from each per bench).`
+      : `I found one plain list with no stream / language columns, so I’ll simply shuffle everyone within it.`;
+  }
+
+  opts.innerHTML = options.map(o=>{
+    const sel = o.id === currentId ? ' sel' : '';
+    const checked = o.id === currentId ? 'checked' : '';
+    const reco = o.id === recoId ? '<span class="ai-reco">RECOMMENDED</span>' : '';
+    return `<label class="ai-opt${sel}" data-id="${o.id}">
+      <input type="radio" name="basis" value="${o.id}" ${checked}>
+      <span><span class="ai-title">${o.title}${reco}</span><span class="ai-vals">${o.vals}</span></span>
+    </label>`;
+  }).join('');
 }
 
-/* ---------- jumbling logic ---------- */
+document.getElementById('aiOptions').addEventListener('change', e=>{
+  if (e.target.name !== 'basis') return;
+  const id = e.target.value;
+  window._basisUserChosen = true;
+  window.jumbleBasis = id === 'group' ? 'group' : id.slice(5);
+  document.querySelectorAll('.ai-opt').forEach(el=>el.classList.toggle('sel', el.dataset.id===id));
+  saveState();
+  // if a chart is already showing, re-jumble immediately with the new basis
+  if (document.getElementById('resultTable').style.display !== 'none') renderJumble();
+});
 
-window.currentMode = 'default';
+/* ================= jumbling ================= */
 
 function shuffle(arr){
   const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--){
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
+  for (let i = a.length-1; i>0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
 }
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-function escapeHtml(s){
-  return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// A seat carries the raw name (data-name) and its clash/badge label (data-tag).
+function seatCellHTML(name, tag){
+  return `<td class="seat" draggable="true" data-tag="${escapeHtml(tag||'')}" data-name="${escapeHtml(name)}">${seatInner(name,tag)}</td>`;
 }
-
-// A seat holds a raw student name (data-name) + its class tag (data-cls); the
-// visible content is the name plus a small stream badge. Keeping name/cls in
-// data-attributes lets swap, clash-check and export stay accurate.
-function seatCellHTML(name, cls){
-  return `<td class="seat" draggable="true" data-cls="${cls}" data-name="${escapeHtml(name)}">${seatInner(name, cls)}</td>`;
-}
-function seatInner(name, cls){
+function seatInner(name, tag){
   if (!name || name === '—') return '—';
-  const tag = cls ? ` <span class="stream-tag">${escapeHtml(streamLabel(cls))}</span>` : '';
-  return escapeHtml(name) + tag;
+  const t = tag ? ` <span class="stream-tag">${escapeHtml(tag)}</span>` : '';
+  return escapeHtml(name) + t;
 }
-function renderSeat(td){
-  td.innerHTML = seatInner(td.dataset.name, td.dataset.cls);
+function renderSeat(td){ td.innerHTML = seatInner(td.dataset.name, td.dataset.tag); }
+
+// Look up a student's attributes (by name) from the uploaded records.
+function attrIndex(){
+  const idx = new Map();
+  for (const k of ['A','B','C']) for (const rec of (window.groupRecords[k]||[])){
+    idx.set(rec.name.toLowerCase(), rec.attrs);
+    idx.set(rec.plain.toLowerCase(), rec.attrs);
+  }
+  return idx;
+}
+
+// Build the pools that mixed-mode draws from, based on the chosen basis.
+// Each pool = {tag, q:[names]}. Mixed mode puts one from each pool per bench.
+function buildPools(){
+  const basis = window.jumbleBasis || 'group';
+  if (basis === 'group'){
+    return ['A','B','C']
+      .map(k=>({tag: streamLabel(k), q: shuffle(namesFromEditor(k))}))
+      .filter(p=>p.q.length);
+  }
+  const idx = attrIndex();
+  const byVal = new Map();
+  for (const k of ['A','B','C']){
+    for (const name of namesFromEditor(k)){
+      const attrs = idx.get(name.toLowerCase()) || {};
+      const val = attrs[basis] || 'Unassigned';
+      if (!byVal.has(val)) byVal.set(val, []);
+      byVal.get(val).push(name);
+    }
+  }
+  // biggest pools first so the sort in the fill loop is stable
+  return [...byVal.entries()]
+    .sort((a,b)=>b[1].length-a[1].length)
+    .map(([tag,arr])=>({tag, q: shuffle(arr)}));
+}
+
+// Human-readable name of the current basis, for badges in the mode display.
+function basisLabel(){
+  if (window.jumbleBasis === 'group'){
+    const gs = groupsWithNames();
+    return gs.length>1 ? 'group' : 'list';
+  }
+  const {criteria} = detectCriteria();
+  const c = criteria.find(x=>x.key===window.jumbleBasis);
+  return c ? c.label : window.jumbleBasis;
 }
 
 function renderJumble(){
   const benches = parseInt(document.getElementById('benchCount').value) || 0;
   if (benches < 1){ alert('Please enter the number of benches.'); return; }
+  if (groupsWithNames().length === 0){ alert('Upload at least one class list.'); return; }
 
-  const A = namesFromEditor('A');
-  const B = namesFromEditor('B');
-  const C = namesFromEditor('C');
+  const pools = buildPools();
+  const canMix = pools.length >= 2;
 
-  const classCount = [A, B, C].filter(c=>c.length).length;
-  if (classCount === 0){
-    alert('Upload at least one class list.');
-    return;
-  }
-
-  // Show/hide toggle based on mode eligibility
   const toggleBtn = document.getElementById('toggleModeBtn');
-  if (classCount === 1){
-    toggleBtn.style.display = 'none';
-    window.currentMode = 'single';
-  } else {
-    toggleBtn.style.display = '';
-    // With multi-class, allow both modes; default to mixed on first load
-    if (!window.currentMode || window.currentMode === 'default') window.currentMode = 'mixed';
+  toggleBtn.style.display = canMix ? '' : 'none';
+  // default to mixed whenever mixing is possible
+  if (!canMix) window.currentMode = 'single';
+  else if (window.currentMode === 'default' || window.currentMode === 'single' && !toggleBtn._userForced) {
+    if (window.currentMode === 'default') window.currentMode = 'mixed';
   }
+  if (!canMix) window.currentMode = 'single';
 
   const tbody = document.querySelector('#resultTable tbody');
   tbody.innerHTML = '';
 
-  const withTag = (arr,tag)=>arr.map(name=>({name, cls:tag}));
-
-  if (window.currentMode === 'single'){
-    // Single-class mode: pool every student and jumble together, but keep each
-    // student's stream tag so the badge still shows where they came from.
-    const all = shuffle([...withTag(A,'A'), ...withTag(B,'B'), ...withTag(C,'C')]);
-    for (let i = 0; i < benches; i++){
-      const s1 = all[i*2], s2 = all[i*2+1];
+  if (window.currentMode === 'single' || !canMix){
+    // pool everyone together (keep each student's tag for the badge)
+    const flat = shuffle(pools.flatMap(p=>p.q.map(name=>({name, tag:p.tag}))));
+    for (let i=0;i<benches;i++){
+      const s1=flat[i*2], s2=flat[i*2+1];
       tbody.insertAdjacentHTML('beforeend',
-        `<tr><td>${i+1}</td>${seatCellHTML(s1?s1.name:'—', s1?s1.cls:'')}${seatCellHTML(s2?s2.name:'—', s2?s2.cls:'')}</tr>`);
+        `<tr><td>${i+1}</td>${seatCellHTML(s1?s1.name:'—', s1?s1.tag:'')}${seatCellHTML(s2?s2.name:'—', s2?s2.tag:'')}</tr>`);
     }
-    const unseated = all.slice(benches * 2);
-    if (unseated.length){
-      tbody.insertAdjacentHTML('beforeend',
-        `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${unseated.map(s=>escapeHtml(s.name)).join(', ')}</td></tr>`);
-    }
+    const rest = flat.slice(benches*2);
+    if (rest.length) tbody.insertAdjacentHTML('beforeend',
+      `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${rest.map(s=>escapeHtml(s.name)).join(', ')}</td></tr>`);
   } else {
-    // Mixed mode: one student from each stream per bench — same-stream students
-    // never share a bench, so nobody can copy a paper they're both writing.
-    const pools = [
-      {tag:'A', q: shuffle([...A])},
-      {tag:'B', q: shuffle([...B])},
-      {tag:'C', q: shuffle([...C])}
-    ].filter(p=>p.q.length);
-
-    const total = pools.reduce((n,p)=>n+p.q.length, 0);
-    if (benches * 2 < total){
-      if (!confirm(`⚠ ${total} students but only ${benches} benches × 2 seats = ${benches*2} seats.\nContinue?`)) return;
-    }
-
-    for (let i = 0; i < benches; i++){
+    // mixed: one from each pool per bench → no two same-tag students together
+    const total = pools.reduce((n,p)=>n+p.q.length,0);
+    if (benches*2 < total && !confirm(`⚠ ${total} students but only ${benches} benches × 2 = ${benches*2} seats.\nContinue?`)) return;
+    for (let i=0;i<benches;i++){
       const byRemaining = [...pools].sort((a,b)=>b.q.length-a.q.length);
-      let html = '';
-      for (let s = 0; s < 2; s++){
+      let html='';
+      for (let s=0;s<2;s++){
         const p = byRemaining[s];
-        if (p && p.q.length) html += seatCellHTML(p.q.shift(), p.tag);
-        else html += seatCellHTML('—', '');
+        html += (p && p.q.length) ? seatCellHTML(p.q.shift(), p.tag) : seatCellHTML('—','');
       }
       tbody.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td>${html}</tr>`);
     }
-
-    const leftover = pools.flatMap(p=>p.q.map(n=>`${escapeHtml(n)} (${escapeHtml(streamLabel(p.tag))})`));
-    if (leftover.length){
-      tbody.insertAdjacentHTML('beforeend',
-        `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
-    }
+    const leftover = pools.flatMap(p=>p.q.map(n=>`${escapeHtml(n)} (${escapeHtml(p.tag)})`));
+    if (leftover.length) tbody.insertAdjacentHTML('beforeend',
+      `<tr class="unseated"><td colspan="3" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
   }
 
   markClashes();
 
-  const school = document.getElementById('schoolName').value.trim();
-  const exam = document.getElementById('examTitle').value.trim();
+  const school=v('schoolName').trim(), exam=v('examTitle').trim();
   document.getElementById('phSchool').textContent = school;
   document.getElementById('phExam').textContent = exam;
   document.getElementById('phMeta').textContent =
     `Seating Chart • ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})} • ${benches} benches`;
-  document.getElementById('printHeader').style.display = (school || exam) ? '' : 'none';
+  document.getElementById('printHeader').style.display = (school||exam) ? '' : 'none';
 
-  document.getElementById('resultTable').style.display = 'table';
-  document.getElementById('swapHint').style.display = window.currentMode === 'mixed' ? '' : 'none';
-  document.getElementById('tools').style.display = 'flex';
+  document.getElementById('resultTable').style.display='table';
+  document.getElementById('swapHint').style.display = window.currentMode==='mixed' ? '' : 'none';
+  document.getElementById('tools').style.display='flex';
   updateModeDisplay();
   document.getElementById('resultTable').scrollIntoView({behavior:'smooth'});
   saveState();
@@ -563,124 +681,86 @@ function renderJumble(){
 
 function updateModeDisplay(){
   const span = document.getElementById('modeSpan');
-  if (window.currentMode === 'single'){
-    span.innerHTML = '<span class="mode-badge">📌 Single Class</span>';
-  } else if (window.currentMode === 'mixed'){
-    span.innerHTML = '<span class="mode-badge">🔀 Mixed Classes</span>';
-  } else {
-    span.innerHTML = '';
-  }
+  if (window.currentMode==='single') span.innerHTML = '<span class="mode-badge">📌 Within one list</span>';
+  else if (window.currentMode==='mixed') span.innerHTML = `<span class="mode-badge">🔀 Mixed by ${escapeHtml(basisLabel())}</span>`;
+  else span.innerHTML = '';
+  const tb = document.getElementById('toggleModeBtn');
+  tb.textContent = window.currentMode==='mixed' ? '🔄 Jumble within one list' : '🔀 Mix by ' + basisLabel();
 }
 
-function isValidMode(){
-  return window.currentMode === 'single' || window.currentMode === 'mixed';
-}
-
-document.getElementById('uploadForm').addEventListener('submit', e=>{
-  e.preventDefault();
-  renderJumble();
-});
-
-document.getElementById('toggleModeBtn').addEventListener('click', ()=>{
-  window.currentMode = window.currentMode === 'mixed' ? 'single' : 'mixed';
-  saveState();
-  renderJumble();
-});
-
+document.getElementById('uploadForm').addEventListener('submit', e=>{ e.preventDefault(); renderJumble(); });
 document.getElementById('reshuffleBtn').addEventListener('click', renderJumble);
+document.getElementById('toggleModeBtn').addEventListener('click', ()=>{
+  window.currentMode = window.currentMode==='mixed' ? 'single' : 'mixed';
+  document.getElementById('toggleModeBtn')._userForced = true;
+  saveState(); renderJumble();
+});
 
-/* ---------- manual swap: tap-tap or drag & drop ---------- */
+/* ================= manual swap ================= */
 
 let selectedSeat = null;
-
-function swapSeats(a, b){
-  if (a === b) return;
-  const an = a.dataset.name, ac = a.dataset.cls;
-  a.dataset.name = b.dataset.name; a.dataset.cls = b.dataset.cls;
-  b.dataset.name = an; b.dataset.cls = ac;
-  renderSeat(a); renderSeat(b);
-  markClashes();
+function swapSeats(a,b){
+  if (a===b) return;
+  const an=a.dataset.name, at=a.dataset.tag;
+  a.dataset.name=b.dataset.name; a.dataset.tag=b.dataset.tag;
+  b.dataset.name=an; b.dataset.tag=at;
+  renderSeat(a); renderSeat(b); markClashes();
 }
-
 function markClashes(){
   document.querySelectorAll('#resultTable tbody tr').forEach(tr=>{
     if (tr.classList.contains('unseated')) return;
-    const seats = [...tr.querySelectorAll('td.seat')];
-    const cls = seats.filter(td=>td.dataset.name && td.dataset.name !== '—').map(td=>td.dataset.cls).filter(Boolean);
-    if (window.currentMode === 'mixed'){
-      tr.classList.toggle('clash', new Set(cls).size !== cls.length && cls.length > 0);
-    }
+    const tags = [...tr.querySelectorAll('td.seat')]
+      .filter(td=>td.dataset.name && td.dataset.name!=='—')
+      .map(td=>td.dataset.tag).filter(Boolean);
+    if (window.currentMode==='mixed')
+      tr.classList.toggle('clash', new Set(tags).size !== tags.length && tags.length>0);
   });
 }
-
 const table = document.getElementById('resultTable');
-
 table.addEventListener('click', e=>{
-  const td = e.target.closest('td.seat');
-  if (!td || window.currentMode !== 'mixed') return;
-  if (!selectedSeat){
-    selectedSeat = td;
-    td.classList.add('selected');
-  } else {
-    selectedSeat.classList.remove('selected');
-    swapSeats(selectedSeat, td);
-    selectedSeat = null;
-  }
+  const td = e.target.closest('td.seat'); if (!td) return;
+  if (!selectedSeat){ selectedSeat=td; td.classList.add('selected'); }
+  else { selectedSeat.classList.remove('selected'); swapSeats(selectedSeat, td); selectedSeat=null; }
 });
-
 table.addEventListener('dragstart', e=>{
-  const td = e.target.closest('td.seat');
-  if (!td || window.currentMode !== 'mixed'){ e.preventDefault(); return; }
-  selectedSeat && selectedSeat.classList.remove('selected');
-  selectedSeat = null;
-  e.dataTransfer.effectAllowed = 'move';
-  table._dragSrc = td;
+  const td=e.target.closest('td.seat'); if(!td){e.preventDefault();return;}
+  selectedSeat && selectedSeat.classList.remove('selected'); selectedSeat=null;
+  e.dataTransfer.effectAllowed='move'; table._dragSrc=td;
 });
-table.addEventListener('dragover', e=>{
-  if (e.target.closest('td.seat')) e.preventDefault();
-});
+table.addEventListener('dragover', e=>{ if (e.target.closest('td.seat')) e.preventDefault(); });
 table.addEventListener('drop', e=>{
-  const td = e.target.closest('td.seat');
+  const td=e.target.closest('td.seat');
   if (td && table._dragSrc){ e.preventDefault(); swapSeats(table._dragSrc, td); }
-  table._dragSrc = null;
+  table._dragSrc=null;
 });
 
-/* ---------- export ---------- */
+/* ================= export ================= */
 
-// Build a clean 2-D array from the chart. Seat cells become "Name (Stream)"
-// so the stream survives export instead of the badge concatenating oddly.
 function chartToRows(){
-  const out = [];
+  const out=[];
   document.querySelectorAll('#resultTable thead tr, #resultTable tbody tr').forEach(tr=>{
     out.push([...tr.children].map(td=>{
       if (td.classList.contains('seat')){
         const name = td.dataset.name || '—';
-        if (!name || name === '—') return '—';
-        return td.dataset.cls ? `${name} (${streamLabel(td.dataset.cls)})` : name;
+        if (!name || name==='—') return '—';
+        return td.dataset.tag ? `${name} (${td.dataset.tag})` : name;
       }
       return td.textContent;
     }));
   });
   return out;
 }
-
 document.getElementById('exportBtn').addEventListener('click', ()=>{
-  const csv = chartToRows()
-    .map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'seating_chart.csv';
-  link.click();
-  URL.revokeObjectURL(link.href);
+  const csv = chartToRows().map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const link=document.createElement('a'); link.href=URL.createObjectURL(blob);
+  link.download='seating_chart.csv'; link.click(); URL.revokeObjectURL(link.href);
 });
-
 document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
-  const wb = XLSX.utils.book_new();
+  const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chartToRows()), 'Seating Chart');
-  XLSX.writeFile(wb, 'seating_chart.xlsx');
+  XLSX.writeFile(wb,'seating_chart.xlsx');
 });
-
 document.getElementById('printBtn').addEventListener('click', ()=>window.print());
 
 restoreState();
