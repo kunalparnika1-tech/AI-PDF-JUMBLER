@@ -48,7 +48,7 @@
   .upload-card:hover{transform:scale(1.01);}
   .file-row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1rem;}
   .file-row label{min-width:6.5rem;font-weight:600;margin:0;}
-  .file-row input[type=file]{flex:1;min-width:220px;margin:0;}
+  .file-row input[type=file],.file-row input[type=text]{flex:1;min-width:220px;margin:0;}
   .file-status{font-size:.85rem;color:#444;flex-basis:100%;padding-left:6.5rem;}
   .file-status.ok{color:#0a7a3d;font-weight:600;}
   .file-status.err{color:#c0392b;font-weight:600;}
@@ -60,13 +60,17 @@
   button:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,0,0,0.3);}
   button:disabled{opacity:.5;transform:none;box-shadow:none;cursor:not-allowed;}
   table{
-    margin-top:2rem;width:100%;border-radius:12px;overflow:hidden;
+    margin-top:1rem;width:100%;border-radius:12px;overflow:hidden;
     text-align:center;background:#fefefe;box-shadow:0 5px 25px rgba(0,0,0,0.08);
   }
   th{background:linear-gradient(90deg,var(--blue),var(--mint));color:#fff;}
   tr:nth-child(even){background:#f4f6ff;}
+  td.seat{cursor:pointer;user-select:none;}
+  td.seat.selected{outline:3px solid var(--pink);outline-offset:-3px;border-radius:6px;}
+  tr.clash td{background:#ffd6d6 !important;color:#8b0000;}
+  .swap-hint{font-size:.8rem;color:#666;margin-top:.5rem;text-align:center;}
   .toolbar{
-    display:flex;justify-content:flex-end;gap:.6rem;align-items:center;
+    display:flex;justify-content:flex-end;gap:.6rem;align-items:center;flex-wrap:wrap;
     background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-top:1.5rem;
   }
   .toolbar button{padding:.4rem 1rem;}
@@ -75,14 +79,48 @@
   .names-preview h5{margin:0 0 .5rem 0;}
   .names-preview textarea{width:100%;min-height:180px;font-size:.85rem;resize:vertical;}
   .names-count{font-size:.8rem;color:#555;}
+  .print-header{text-align:center;margin-top:2rem;}
+  .print-header h2{margin-bottom:.2rem;}
+  .print-header p{margin:.1rem 0;color:#444;}
   footer{text-align:center;padding:2rem 0;}
   footer a{color:#fff;text-decoration:underline;}
+
+  /* ---- dark mode ---- */
+  @media (prefers-color-scheme: dark){
+    main.container{background:rgba(24,26,40,0.97);color:#e8e8ef;}
+    .upload-card{background:linear-gradient(135deg,#23253a,#1a1c2c);}
+    .file-status{color:#aab;}
+    .file-status.ok{color:#4ade80;}
+    .file-status.err{color:#f87171;}
+    table{background:#1e2030;color:#e8e8ef;}
+    tr:nth-child(even){background:#262a40;}
+    tr.clash td{background:#4a1a1a !important;color:#ffb4b4;}
+    .toolbar{background:rgba(30,32,48,0.85);}
+    .names-count,.swap-hint{color:#99a;}
+    .print-header p{color:#aab;}
+  }
+
+  /* ---- mobile ---- */
+  @media (max-width:640px){
+    main.container{padding:1rem;margin-top:1rem;}
+    .upload-card{padding:1rem;}
+    .file-row label{min-width:100%;}
+    .file-status{padding-left:0;}
+    .toolbar{justify-content:center;}
+    table{font-size:.85rem;}
+    nav ul li a{padding:.3rem;}
+  }
+
+  /* ---- print ---- */
   @media print{
     body{background:#fff;animation:none;}
-    nav,footer,.upload-card,.toolbar,.names-preview,hgroup h3{display:none!important;}
-    main.container{box-shadow:none;margin:0;}
+    nav,footer,.upload-card,.toolbar,.names-preview,.swap-hint,hgroup{display:none!important;}
+    main.container{box-shadow:none;margin:0;padding:0;}
+    .print-header h2{-webkit-text-fill-color:#000;background:none;color:#000;}
+    .print-header p{color:#000;}
     table{box-shadow:none;}
     th{color:#000;background:#ddd;-webkit-print-color-adjust:exact;}
+    td.seat.selected{outline:none;}
   }
 </style>
 </head>
@@ -106,13 +144,21 @@
     <div class="upload-card">
       <form id="uploadForm">
         <div class="file-row">
+          <label for="schoolName">School</label>
+          <input type="text" id="schoolName" placeholder="School name (shown when printing)">
+        </div>
+        <div class="file-row">
+          <label for="examTitle">Exam / Event</label>
+          <input type="text" id="examTitle" placeholder="e.g. Half-Yearly Exam 2026 (optional)">
+        </div>
+        <div class="file-row">
           <label for="classA">Class A</label>
-          <input type="file" id="classA" accept=".pdf,.xlsx,.xls,.csv,.txt" required>
+          <input type="file" id="classA" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusA"></span>
         </div>
         <div class="file-row">
           <label for="classB">Class B</label>
-          <input type="file" id="classB" accept=".pdf,.xlsx,.xls,.csv,.txt" required>
+          <input type="file" id="classB" accept=".pdf,.xlsx,.xls,.csv,.txt">
           <span class="file-status" id="statusB"></span>
         </div>
         <div class="file-row">
@@ -133,13 +179,20 @@
     <div class="names-preview" id="namesPreview" style="display:none;">
       <article><h5>Class A <span class="names-count" id="countA"></span></h5><textarea id="editA" spellcheck="false"></textarea></article>
       <article><h5>Class B <span class="names-count" id="countB"></span></h5><textarea id="editB" spellcheck="false"></textarea></article>
-      <article id="cardC" style="display:none;"><h5>Class C <span class="names-count" id="countC"></span></h5><textarea id="editC" spellcheck="false"></textarea></article>
+      <article id="cardC"><h5>Class C <span class="names-count" id="countC"></span></h5><textarea id="editC" spellcheck="false"></textarea></article>
+    </div>
+
+    <div class="print-header" id="printHeader" style="display:none;">
+      <h2 id="phSchool"></h2>
+      <p id="phExam"></p>
+      <p id="phMeta"></p>
     </div>
 
     <table id="resultTable" style="display:none;">
       <thead><tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th><th>Seat 3</th></tr></thead>
       <tbody></tbody>
     </table>
+    <p class="swap-hint" id="swapHint" style="display:none;">💡 Tap one student, then tap another to swap their seats (or drag &amp; drop). A red bench means two students from the same class.</p>
 
     <div class="toolbar" id="tools" style="display:none;">
       <button id="reshuffleBtn">🔀 Re-Jumble</button>
@@ -173,7 +226,7 @@ function cleanNames(rawList){
       .trim();
     if (!s || s.length < 2 || s.length > 60) continue;
     if (NOISE.test(s)) continue;
-    if (!/[a-zA-Z-￿]{2}/.test(s)) continue; // must contain letters
+    if (!/[a-zA-Z-￿]{2}/.test(s)) continue; // must contain letters
     const key = s.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -213,8 +266,9 @@ async function extractFromExcel(file){
   for (const sheetName of wb.SheetNames){
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
     if (!rows.length) continue;
-    // pick the column with the most name-like text cells
     const colCount = Math.max(...rows.map(r=>r.length));
+
+    // name column = the one with the most name-like text cells
     let bestCol = 0, bestScore = -1;
     for (let c = 0; c < colCount; c++){
       let score = 0;
@@ -224,7 +278,23 @@ async function extractFromExcel(file){
       }
       if (score > bestScore){ bestScore = score; bestCol = c; }
     }
-    for (const r of rows) cells.push(String(r[bestCol] ?? ''));
+
+    // roll-number column: only trusted when a header explicitly says "roll"
+    // (a numeric-majority guess would confuse S.No columns with roll numbers)
+    let rollCol = -1;
+    (rows[0] || []).forEach((h,c)=>{
+      if (c !== bestCol && /roll/i.test(String(h))) rollCol = c;
+    });
+
+    for (const r of rows){
+      const name = String(r[bestCol] ?? '').trim();
+      const roll = rollCol >= 0 ? String(r[rollCol] ?? '').trim() : '';
+      if (name && roll && !NOISE.test(name) && /^[\w\/-]{1,12}$/.test(roll) && !/roll/i.test(roll)){
+        cells.push(`${name} (${roll})`);
+      } else {
+        cells.push(name);
+      }
+    }
   }
   return cleanNames(cells);
 }
@@ -241,20 +311,55 @@ async function extractNames(file){
   return extractFromText(file);
 }
 
-/* ---------- per-file live status + preview ---------- */
+/* ---------- save / restore (localStorage) ---------- */
 
-const classes = { A:[], B:[], C:[] };
+const STORE_KEY = 'jumbler-state-v1';
+
+function saveState(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      A: document.getElementById('editA').value,
+      B: document.getElementById('editB').value,
+      C: document.getElementById('editC').value,
+      bench: document.getElementById('benchCount').value,
+      school: document.getElementById('schoolName').value,
+      exam: document.getElementById('examTitle').value
+    }));
+  }catch(e){ /* storage full or blocked — non-fatal */ }
+}
+
+function restoreState(){
+  let s;
+  try{ s = JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){ return; }
+  if (!s) return;
+  document.getElementById('editA').value = s.A || '';
+  document.getElementById('editB').value = s.B || '';
+  document.getElementById('editC').value = s.C || '';
+  document.getElementById('benchCount').value = s.bench || '';
+  document.getElementById('schoolName').value = s.school || '';
+  document.getElementById('examTitle').value = s.exam || '';
+  if (s.A || s.B || s.C) refreshPreview(true);
+}
+
+for (const id of ['editA','editB','editC','benchCount','schoolName','examTitle']){
+  document.getElementById(id).addEventListener('input', ()=>{
+    saveState();
+    if (id.startsWith('edit')) updateCounts();
+  });
+}
+
+/* ---------- per-file live status + preview ---------- */
 
 for (const k of ['A','B','C']){
   document.getElementById('class'+k).addEventListener('change', async e=>{
     const status = document.getElementById('status'+k);
     const file = e.target.files[0];
-    if (!file){ status.textContent=''; classes[k]=[]; refreshPreview(); return; }
+    if (!file){ status.textContent=''; return; }
     status.className = 'file-status';
     status.textContent = '⏳ Reading ' + file.name + ' …';
     try{
       const names = await extractNames(file);
-      classes[k] = names;
+      document.getElementById('edit'+k).value = names.join('\n');
       if (names.length){
         status.className = 'file-status ok';
         status.textContent = `✅ ${names.length} students found in ${file.name}`;
@@ -263,23 +368,25 @@ for (const k of ['A','B','C']){
         status.textContent = `⚠ No names detected in ${file.name} — you can type them in the preview box below`;
       }
     }catch(err){
-      classes[k] = [];
       status.className = 'file-status err';
       status.textContent = '❌ Could not read ' + file.name + ' (' + err.message + ')';
     }
     refreshPreview();
+    saveState();
   });
 }
 
-function refreshPreview(){
-  const any = classes.A.length || classes.B.length || classes.C.length;
-  document.getElementById('namesPreview').style.display = any ? 'grid' : 'none';
+function updateCounts(){
   for (const k of ['A','B','C']){
-    document.getElementById('edit'+k).value = classes[k].join('\n');
-    document.getElementById('count'+k).textContent = classes[k].length ? `(${classes[k].length})` : '';
+    const n = cleanNames(document.getElementById('edit'+k).value.split('\n')).length;
+    document.getElementById('count'+k).textContent = n ? `(${n})` : '';
   }
-  document.getElementById('cardC').style.display =
-    (classes.C.length || document.getElementById('classC').files.length) ? '' : 'none';
+}
+
+function refreshPreview(keepValues){
+  const any = ['A','B','C'].some(k=>document.getElementById('edit'+k).value.trim());
+  document.getElementById('namesPreview').style.display = any ? 'grid' : 'none';
+  updateCounts();
 }
 
 // textareas are the source of truth at jumble time (teacher can fix names)
@@ -326,24 +433,38 @@ function renderJumble(){
   tbody.innerHTML = '';
   for (let i = 0; i < benches; i++){
     const byRemaining = [...pools].sort((a,b)=>b.q.length-a.q.length);
-    const seats = [];
-    for (let s = 0; s < seatsPerBench; s++){
+    let cells = '';
+    for (let s = 0; s < 3; s++){
       const p = byRemaining[s];
-      seats.push(p && p.q.length ? p.q.shift() : '—');
+      if (s < seatsPerBench && p && p.q.length){
+        cells += `<td class="seat" draggable="true" data-cls="${p.tag}">${p.q.shift()}</td>`;
+      } else {
+        cells += `<td class="seat" draggable="true" data-cls="">—</td>`;
+      }
     }
-    tbody.insertAdjacentHTML('beforeend',
-      `<tr><td>${i+1}</td><td>${seats[0]}</td><td>${seats[1]}</td><td>${seats[2] ?? '—'}</td></tr>`);
+    tbody.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td>${cells}</tr>`);
   }
 
   const leftover = pools.flatMap(p=>p.q.map(n=>`${n} (${p.tag})`));
   if (leftover.length){
     tbody.insertAdjacentHTML('beforeend',
-      `<tr><td colspan="4" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
+      `<tr class="unseated"><td colspan="4" style="color:#c0392b;">Unseated: ${leftover.join(', ')}</td></tr>`);
   }
 
+  // printable header
+  const school = document.getElementById('schoolName').value.trim();
+  const exam = document.getElementById('examTitle').value.trim();
+  document.getElementById('phSchool').textContent = school;
+  document.getElementById('phExam').textContent = exam;
+  document.getElementById('phMeta').textContent =
+    `Seating Chart • ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})} • ${benches} benches`;
+  document.getElementById('printHeader').style.display = (school || exam) ? '' : 'none';
+
   document.getElementById('resultTable').style.display = 'table';
+  document.getElementById('swapHint').style.display = '';
   document.getElementById('tools').style.display = 'flex';
   document.getElementById('resultTable').scrollIntoView({behavior:'smooth'});
+  saveState();
 }
 
 document.getElementById('uploadForm').addEventListener('submit', e=>{
@@ -351,6 +472,60 @@ document.getElementById('uploadForm').addEventListener('submit', e=>{
   renderJumble();
 });
 document.getElementById('reshuffleBtn').addEventListener('click', renderJumble);
+
+/* ---------- manual swap: tap-tap or drag & drop ---------- */
+
+let selectedSeat = null;
+
+function swapSeats(a, b){
+  if (a === b) return;
+  [a.textContent, b.textContent] = [b.textContent, a.textContent];
+  const c = a.dataset.cls; a.dataset.cls = b.dataset.cls; b.dataset.cls = c;
+  markClashes();
+}
+
+function markClashes(){
+  document.querySelectorAll('#resultTable tbody tr').forEach(tr=>{
+    if (tr.classList.contains('unseated')) return;
+    const cls = [...tr.querySelectorAll('td.seat')]
+      .filter(td=>td.textContent !== '—')
+      .map(td=>td.dataset.cls)
+      .filter(Boolean);
+    tr.classList.toggle('clash', new Set(cls).size !== cls.length);
+  });
+}
+
+const table = document.getElementById('resultTable');
+
+table.addEventListener('click', e=>{
+  const td = e.target.closest('td.seat');
+  if (!td) return;
+  if (!selectedSeat){
+    selectedSeat = td;
+    td.classList.add('selected');
+  } else {
+    selectedSeat.classList.remove('selected');
+    swapSeats(selectedSeat, td);
+    selectedSeat = null;
+  }
+});
+
+table.addEventListener('dragstart', e=>{
+  const td = e.target.closest('td.seat');
+  if (!td){ e.preventDefault(); return; }
+  selectedSeat && selectedSeat.classList.remove('selected');
+  selectedSeat = null;
+  e.dataTransfer.effectAllowed = 'move';
+  table._dragSrc = td;
+});
+table.addEventListener('dragover', e=>{
+  if (e.target.closest('td.seat')) e.preventDefault();
+});
+table.addEventListener('drop', e=>{
+  const td = e.target.closest('td.seat');
+  if (td && table._dragSrc){ e.preventDefault(); swapSeats(table._dragSrc, td); }
+  table._dragSrc = null;
+});
 
 /* ---------- export ---------- */
 
@@ -372,6 +547,8 @@ document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
 });
 
 document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+
+restoreState();
 </script>
 </body>
 </html>
