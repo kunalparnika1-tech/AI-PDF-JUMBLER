@@ -52,6 +52,10 @@
   .ai-reco{display:inline-block;font-size:.65rem;font-weight:700;background:var(--violet);color:#fff;
     padding:.05rem .45rem;border-radius:10px;margin-left:.4rem;vertical-align:middle;}
 
+  .ai-switch{padding:.35rem 1rem;font-size:.85rem;border-radius:50px;
+    background:linear-gradient(90deg,var(--mint),var(--blue));}
+  .ai-switch.off{background:#6b7080;}
+
   /* ask-basis modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(10,10,25,0.55);backdrop-filter:blur(3px);
     display:flex;align-items:center;justify-content:center;z-index:100;animation:fadeIn .25s ease;}
@@ -137,7 +141,10 @@
 <nav class="container-fluid">
   <ul>
     <li><strong>AI Student Seat Jumbler</strong></li>
-    <li style="display:flex;gap:1rem;align-items:center;"><span id="modeSpan"></span></li>
+    <li style="display:flex;gap:1rem;align-items:center;">
+      <span id="modeSpan"></span>
+      <button type="button" id="aiToggleBtn" class="ai-switch">🧠 AI: ON</button>
+    </li>
   </ul>
 </nav>
 
@@ -190,8 +197,10 @@
           <label for="benchCount">Benches</label>
           <input type="number" id="benchCount" placeholder="Number of benches" min="1" required style="max-width:220px;margin:0;">
         </div>
-        <div style="text-align:center;margin-top:1rem;">
+        <div style="text-align:center;margin-top:1rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;">
           <button type="submit" id="jumbleBtn">✨ Jumble Seats</button>
+          <button type="button" id="saveBtn" style="background:linear-gradient(90deg,var(--mint),var(--blue));">💾 Save Lists</button>
+          <button type="button" id="clearAllBtn" style="background:#8a8fa3;">🗑 Clear All</button>
         </div>
       </form>
     </div>
@@ -405,13 +414,57 @@ function restoreState(){
   if (s.A || s.B || s.C){ refreshPreview(); renderAIPanel(); }
 }
 
+// Nothing auto-saves — the teacher decides what's worth keeping via 💾 Save.
 for (const id of ['editA','editB','editC','streamA','streamB','streamC','benchCount','schoolName','examTitle']){
   document.getElementById(id).addEventListener('input', ()=>{
-    saveState();
     if (id.startsWith('edit')){ updateCounts(); renderAIPanel(); }
     if (id.startsWith('stream')){ updateHeaders(); renderAIPanel(); }
   });
 }
+
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  saveState();
+  const b = document.getElementById('saveBtn');
+  b.textContent = '✅ Saved!';
+  setTimeout(()=>{ b.textContent = '💾 Save Lists'; }, 1600);
+});
+
+document.getElementById('clearAllBtn').addEventListener('click', ()=>{
+  if (!confirm('Clear all lists, streams and the saved copy?')) return;
+  ['editA','editB','editC','streamA','streamB','streamC','benchCount','schoolName','examTitle']
+    .forEach(id=>{ document.getElementById(id).value=''; });
+  ['A','B','C'].forEach(k=>{
+    document.getElementById('class'+k).value='';
+    document.getElementById('status'+k).textContent='';
+  });
+  window.groupRecords = {A:[],B:[],C:[]};
+  window.jumbleBasis = 'group'; window._basisUserChosen = false; window.currentMode = 'default';
+  document.getElementById('resultTable').style.display='none';
+  document.getElementById('tools').style.display='none';
+  document.getElementById('swapHint').style.display='none';
+  document.getElementById('printHeader').style.display='none';
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+  refreshPreview(); renderAIPanel(); updateModeDisplay();
+});
+
+/* ---------- AI on/off ---------- */
+
+const AI_KEY = 'jumbler-ai-enabled';
+window.aiEnabled = (()=>{ try{ return localStorage.getItem(AI_KEY) !== 'off'; }catch(e){ return true; } })();
+
+function updateAIToggle(){
+  const b = document.getElementById('aiToggleBtn');
+  b.textContent = window.aiEnabled ? '🧠 AI: ON' : '🧠 AI: OFF';
+  b.classList.toggle('off', !window.aiEnabled);
+}
+
+document.getElementById('aiToggleBtn').addEventListener('click', ()=>{
+  window.aiEnabled = !window.aiEnabled;
+  try{ localStorage.setItem(AI_KEY, window.aiEnabled ? 'on' : 'off'); }catch(e){}
+  if (!window.aiEnabled){ window.jumbleBasis = 'group'; window._basisUserChosen = false; }
+  updateAIToggle(); renderAIPanel();
+  if (document.getElementById('resultTable').style.display !== 'none') renderJumble();
+});
 
 /* ================= upload handling ================= */
 
@@ -419,7 +472,7 @@ for (const k of ['A','B','C']){
   document.getElementById('class'+k).addEventListener('change', async e=>{
     const status = document.getElementById('status'+k);
     const file = e.target.files[0];
-    if (!file){ status.textContent=''; window.groupRecords[k]=[]; refreshPreview(); renderAIPanel(); saveState(); return; }
+    if (!file){ status.textContent=''; window.groupRecords[k]=[]; refreshPreview(); renderAIPanel(); return; }
     status.className = 'file-status';
     status.textContent = '⏳ Reading ' + file.name + ' …';
     try{
@@ -439,7 +492,7 @@ for (const k of ['A','B','C']){
       status.className = 'file-status err';
       status.textContent = '❌ Error: ' + err.message;
     }
-    refreshPreview(); renderAIPanel(); saveState();
+    refreshPreview(); renderAIPanel();
   });
 }
 
@@ -513,8 +566,16 @@ function groupsWithNames(){ return ['A','B','C'].filter(k=>namesFromEditor(k).le
 // One source of truth for "how could we jumble?" — used by the AI panel
 // and by the ask-me-first modal.
 function buildBasisOptions(){
-  const {criteria, total} = detectCriteria();
   const groups = groupsWithNames();
+  // AI off → no column detection, no recommendations: classic mode only.
+  if (!window.aiEnabled){
+    const total = groups.reduce((n,k)=>n+namesFromEditor(k).length, 0);
+    const groupLabels = groups.map(streamLabel);
+    return {options:[{id:'group', title:'Classic — one from each uploaded group',
+      vals: groups.length>1 ? groupLabels.join(', ') : 'only one group uploaded — jumbles within it',
+      key:'group'}], recoId:'group', criteria:[], total, groups};
+  }
+  const {criteria, total} = detectCriteria();
   const options = [];
   criteria.forEach(c=>{
     const preview = c.values.slice(0,6).join(', ') + (c.values.length>6 ? ', …' : '');
@@ -542,7 +603,7 @@ function optionHTML(o, currentId, recoId, radioName){
 function renderAIPanel(){
   const panel = document.getElementById('aiPanel');
   const anyData = groupsWithNames().length > 0;
-  if (!anyData){ panel.style.display='none'; return; }
+  if (!anyData || !window.aiEnabled){ panel.style.display='none'; return; }
   panel.style.display = '';
 
   const {options, recoId, criteria, total, groups} = buildBasisOptions();
@@ -597,7 +658,7 @@ document.getElementById('basisConfirmBtn').addEventListener('click', ()=>{
     window.jumbleBasis = picked.value === 'group' ? 'group' : picked.value.slice(5);
   }
   document.getElementById('basisModal').style.display = 'none';
-  saveState(); renderAIPanel(); renderJumble();
+  renderAIPanel(); renderJumble();
 });
 
 document.getElementById('basisCancelBtn').addEventListener('click', ()=>{
@@ -613,7 +674,6 @@ document.getElementById('aiOptions').addEventListener('change', e=>{
   window._basisUserChosen = true;
   window.jumbleBasis = id === 'group' ? 'group' : id.slice(5);
   document.querySelectorAll('.ai-opt').forEach(el=>el.classList.toggle('sel', el.dataset.id===id));
-  saveState();
   // if a chart is already showing, re-jumble immediately with the new basis
   if (document.getElementById('resultTable').style.display !== 'none') renderJumble();
 });
@@ -747,7 +807,6 @@ function renderJumble(){
   document.getElementById('tools').style.display='flex';
   updateModeDisplay();
   document.getElementById('resultTable').scrollIntoView({behavior:'smooth'});
-  saveState();
 }
 
 function updateModeDisplay(){
@@ -771,7 +830,7 @@ document.getElementById('reshuffleBtn').addEventListener('click', renderJumble);
 document.getElementById('toggleModeBtn').addEventListener('click', ()=>{
   window.currentMode = window.currentMode==='mixed' ? 'single' : 'mixed';
   document.getElementById('toggleModeBtn')._userForced = true;
-  saveState(); renderJumble();
+  renderJumble();
 });
 
 /* ================= manual swap ================= */
@@ -841,6 +900,7 @@ document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
 });
 document.getElementById('printBtn').addEventListener('click', ()=>window.print());
 
+updateAIToggle();
 restoreState();
 </script>
 </body>
