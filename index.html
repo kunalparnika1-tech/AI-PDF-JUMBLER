@@ -85,6 +85,18 @@
   .ai-opt .ai-vals{font-size:.78rem;color:#555;margin-top:.15rem;}
   .ai-reco{display:inline-block;font-size:.65rem;font-weight:700;background:var(--violet);color:#fff;
     padding:.05rem .45rem;border-radius:10px;margin-left:.4rem;vertical-align:middle;}
+  .ai-label{font-size:.72rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+    color:#7a5bd0;margin:.9rem 0 .4rem 0;}
+  .ai-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.2rem;}
+  .ai-chip{display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;font-weight:600;
+    background:#fff;border:1.5px solid #d8c5ff;border-radius:30px;padding:.28rem .7rem;color:#3a2a63;
+    animation:tagPop .35s cubic-bezier(.34,1.56,.64,1);}
+  .ai-chip b{color:var(--violet);}
+  .ai-chip .ai-src{font-size:.62rem;font-weight:600;color:#8a8aa5;text-transform:uppercase;letter-spacing:.3px;}
+  .ai-none{font-size:.86rem;color:#555;margin:.2rem 0;}
+  .ai-order{margin:.4rem 0 .2rem 1.1rem;padding:0;font-size:.83rem;}
+  .ai-order li{margin:.15rem 0;}
+  .ai-order li:first-child strong{color:var(--violet);}
 
   .ai-switch{padding:.35rem 1rem;font-size:.85rem;border-radius:50px;
     background:linear-gradient(90deg,var(--mint),var(--blue));}
@@ -154,6 +166,9 @@
     .ai-opt{background:rgba(255,255,255,0.06);}.ai-opt:hover{background:rgba(255,255,255,0.12);}
     .ai-opt.sel{background:rgba(255,255,255,0.14);}
     .ai-opt .ai-vals{color:#99a;}
+    .ai-label{color:#b9a3ff;}
+    .ai-chip{background:#23253a;border-color:#4a3a6a;color:#dcd6f5;}
+    .ai-none{color:#aab;}
     table{background:#1e2030;color:#e8e8ef;}
     tr:nth-child(even){background:#262a40;}
     tr.clash td{background:#4a1a1a !important;color:#ffb4b4;}
@@ -260,7 +275,9 @@
 
     <div class="ai-panel" id="aiPanel" style="display:none;">
       <h4>🧠 AI Analysis</h4>
-      <p id="aiSummary"></p>
+      <div id="aiDetected"></div>
+      <div id="aiReco"></div>
+      <div class="ai-label" id="aiModesLabel" style="display:none;">Choose how to jumble</div>
       <div id="aiOptions"></div>
     </div>
 
@@ -322,6 +339,64 @@ const NOISE = /^(s\.?\s?no\.?|sno|sl\.?\s?no\.?|roll\s?no\.?|roll|name|names|stu
 // Common Indian second languages — used to recognise a "2nd language" column
 // even when its header is blank or oddly named.
 const LANGS = /^(sanskrit|hindi|telugu|tamil|urdu|french|german|arabic|kannada|malayalam|marathi|bengali|gujarati|punjabi|odia|assamese|spanish|english)$/i;
+
+/* ---------- dynamic category recognition ----------
+   The AI never assumes a fixed grouping. It maps whatever column headers (or
+   filenames) a school happens to use onto canonical categories via synonyms,
+   and treats any other repeated labelled column as a category too. `weight`
+   is the exam-integrity importance used only to break ties between equally
+   diverse categories — it is NOT what makes a category win on its own. */
+const CATEGORY_DEFS = [
+  {label:'Stream',          weight:1.00, re:/\b(stream|combination|course|elective\s*group|section\s*stream|group)\b/i, reason:'creates the strongest separation — students writing the same stream paper never share a bench'},
+  {label:'Class',           weight:0.78, re:/\b(class\s*name|class|grade|standard|std)\b/i, reason:'keeps different classes / grades from mixing on one bench'},
+  {label:'Second Language', weight:0.85, re:/\b(second\s*language|2nd\s*language|sec(ond)?\.?\s*lang\.?|optional\s*language|language|lang)\b/i, reason:'adds language-paper diversity across the bench'},
+  {label:'Semester',        weight:0.80, re:/\b(semester|sem)\b/i, reason:'keeps different semesters apart'},
+  {label:'Department',      weight:0.90, re:/\b(department|dept|branch|discipline)\b/i, reason:'keeps different departments / branches apart'},
+  {label:'Medium',          weight:0.68, re:/\b(medium)\b/i, reason:'mixes mediums of instruction'},
+  {label:'Section',         weight:0.50, re:/\b(section|sec)\b/i, reason:'provides final balancing across sections'},
+  {label:'House',           weight:0.35, re:/\b(house)\b/i, reason:'mixes houses'},
+  {label:'Gender',          weight:0.25, re:/\b(gender|sex)\b/i, reason:'mixes genders across the bench'},
+];
+// Columns that identify an individual, not a group — detected but never offered
+// as a grouping basis (they have one value per student, so no separation value).
+const IDLIKE_RE = /\b(roll\s*(no\.?|number)?|admission\s*(no\.?|number)?|adm\.?\s*no\.?|reg(istration)?\.?\s*(no\.?|number)?|enroll(ment)?\.?\s*(no\.?|number)?|\bid\b|s\.?\s?no\.?)\b/i;
+const NAME_RE   = /\b(name|student)\b/i;
+
+// Map a raw header onto a canonical category label (or keep it as a custom
+// category if it's a real, unrecognised label).
+function canonicalCategory(header){
+  const h = String(header || '').trim();
+  if (!h) return null;
+  if (IDLIKE_RE.test(h)) return {label:'Roll Number', idlike:true};
+  if (NAME_RE.test(h))   return {label:'Name', nameCol:true};
+  for (const d of CATEGORY_DEFS) if (d.re.test(h)) return {label:d.label, def:d};
+  return {label:h};                          // unknown but labelled → custom category
+}
+function categoryDef(label){ return CATEGORY_DEFS.find(d=>d.label===label) || null; }
+
+// Known intermediate/stream tokens so a *filename* like "MPC.xlsx" can be
+// recognised as a Stream value even with no column inside.
+const STREAM_TOKENS = /\b(mpc|bipc|bpc|mec|cec|hec|mphw|cbz|pcm|pcmb|pcb|commerce|arts|science|humanities)\b/i;
+
+// Infer group-level tags from a filename (+ any stream the teacher typed).
+// e.g. "MPC Section A.xlsx" -> {Stream:'MPC', Section:'A'};
+//      "10th Class.xlsx"    -> {Class:'10'};   "Section B.csv" -> {Section:'B'}
+function parseFileTags(fname, typed){
+  const tags = {};
+  const s = String(fname||'').replace(/\.[^.]+$/,'').replace(/[_\-]+/g,' ').replace(/\(.*?\)/g,' ').trim();
+  if (typed && typed.trim()) tags.Stream = typed.trim();
+  const streamM = s.match(STREAM_TOKENS);
+  if (streamM && !tags.Stream) tags.Stream = streamM[0].toUpperCase();
+  // "Class 10" / "Grade 9" / "10th" / "12"
+  const classM = s.match(/\b(?:class|grade|std|standard)\s*(\d{1,2})\b/i) || s.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/i);
+  if (classM) tags.Class = classM[1];
+  const romanM = s.match(/\b(XII|XI|IX|VIII|VII|VI|X)\b/);
+  if (romanM && !tags.Class) tags.Class = romanM[1];
+  // "Section A" / "Sec B"
+  const secM = s.match(/\bsec(?:tion)?\.?\s*([A-Za-z])\b/i);
+  if (secM) tags.Section = secM[1].toUpperCase();
+  return tags;
+}
 
 function cleanNames(rawList){
   const seen = new Set(), out = [];
@@ -389,15 +464,22 @@ async function extractExcelRich(file){
     }
     // roll column by header
     let rollCol = -1;
-    header.forEach((h,c)=>{ if (c !== bestCol && /roll/i.test(h)) rollCol = c; });
+    header.forEach((h,c)=>{ if (c !== bestCol && IDLIKE_RE.test(h)) rollCol = c; });
 
-    // remaining labelled columns become attributes (skip serial-no columns)
-    const attrCols = [];
+    // Classify every other labelled column into a canonical category. A blank /
+    // odd header whose values are mostly languages is still recognised as a
+    // Second Language column (value-based detection).
+    const catCols = [];
     for (let c = 0; c < colCount; c++){
       if (c === bestCol || c === rollCol) continue;
-      const h = header[c] || '';
-      if (/^(s\.?\s?no\.?|sno|sl\.?\s?no\.?)$/i.test(h)) continue;
-      attrCols.push({c, key: h || ('Column ' + (c+1))});
+      const cat = canonicalCategory(header[c]);
+      let label = cat ? cat.label : ('Column ' + (c+1));
+      if (cat && (cat.idlike || cat.nameCol)) continue;            // never a grouping category
+      const vals = rows.slice(1).map(r=>String(r[c] ?? '').trim()).filter(Boolean);
+      if (!vals.length) continue;
+      const langShare = vals.filter(x=>LANGS.test(x)).length / vals.length;
+      if ((!cat || /^Column /.test(label)) && langShare >= 0.5) label = 'Second Language';
+      catCols.push({c, label});
     }
 
     for (let i = 1; i < rows.length; i++){
@@ -405,17 +487,17 @@ async function extractExcelRich(file){
       const name = String(r[bestCol] ?? '').trim();
       if (!name || NOISE.test(name) || !/[a-zA-Z]{2}/.test(name)) continue;
       const roll = rollCol >= 0 ? String(r[rollCol] ?? '').trim() : '';
-      const attrs = {};
-      for (const {c,key} of attrCols){
-        const v = String(r[c] ?? '').trim();
-        if (v) attrs[key] = v;
+      const cats = {};
+      for (const {c,label} of catCols){
+        const val = String(r[c] ?? '').trim();
+        if (val) cats[label] = val;
       }
-      const display = (roll && /^[\w\/-]{1,12}$/.test(roll) && !/roll/i.test(roll)) ? `${name} (${roll})` : name;
+      const display = (roll && /^[\w\/-]{1,12}$/.test(roll) && !IDLIKE_RE.test(roll)) ? `${name} (${roll})` : name;
       names.push(display);
-      records.push({name: display, plain: name, attrs});
+      records.push({name: display, plain: name, roll, cats});
     }
   }
-  return {names: cleanNames(names), records};
+  return {names: cleanNames(names), records, catLabels: [...new Set(records.flatMap(r=>Object.keys(r.cats)))]};
 }
 
 async function extractAll(file){
@@ -431,7 +513,8 @@ async function extractNames(file){ return (await extractAll(file)).names; }
 
 const STORE_KEY = 'jumbler-state-v1';
 window.groupRecords = {A:[], B:[], C:[]};   // rich records per uploaded group
-window.jumbleBasis  = 'group';              // 'group' (classic) or an attribute key
+window.groupMeta    = {A:{}, B:{}, C:{}};   // {filename, fileTags} per group
+window.jumbleBasis  = 'group';              // 'group' (classic) or a category key
 window.currentMode  = 'default';            // 'mixed' | 'single' | 'default'
 
 function streamLabel(tag){
@@ -446,7 +529,7 @@ function saveState(){
       sA:v('streamA'), sB:v('streamB'), sC:v('streamC'),
       bench:v('benchCount'), school:v('schoolName'), exam:v('examTitle'),
       mode: window.currentMode, basis: window.jumbleBasis, basisChosen: !!window._basisUserChosen,
-      records: window.groupRecords
+      records: window.groupRecords, meta: window.groupMeta
     }));
   }catch(e){}
 }
@@ -464,6 +547,7 @@ function restoreState(){
   window.jumbleBasis = s.basis || 'group';
   window._basisUserChosen = !!s.basisChosen;
   window.groupRecords = s.records || {A:[],B:[],C:[]};
+  window.groupMeta = s.meta || {A:{},B:{},C:{}};
   if (s.A || s.B || s.C){ refreshPreview(); renderAIPanel(); }
 }
 
@@ -490,7 +574,7 @@ document.getElementById('clearAllBtn').addEventListener('click', ()=>{
     document.getElementById('class'+k).value='';
     document.getElementById('status'+k).textContent='';
   });
-  window.groupRecords = {A:[],B:[],C:[]};
+  window.groupRecords = {A:[],B:[],C:[]}; window.groupMeta = {A:{},B:{},C:{}};
   window.jumbleBasis = 'group'; window._basisUserChosen = false; window.currentMode = 'default';
   document.getElementById('resultTable').style.display='none';
   document.getElementById('tools').style.display='none';
@@ -525,34 +609,30 @@ for (const k of ['A','B','C']){
   document.getElementById('class'+k).addEventListener('change', async e=>{
     const status = document.getElementById('status'+k);
     const file = e.target.files[0];
-    if (!file){ status.textContent=''; window.groupRecords[k]=[]; refreshPreview(); renderAIPanel(); return; }
+    if (!file){ status.textContent=''; window.groupRecords[k]=[]; window.groupMeta[k]={}; refreshPreview(); renderAIPanel(); return; }
     status.className = 'file-status';
     status.textContent = '⏳ Reading ' + file.name + ' …';
     try{
-      const {names, records} = await extractAll(file);
+      const {names, records, catLabels} = await extractAll(file);
+      if (!names.length){
+        window.groupRecords[k]=[]; window.groupMeta[k]={};
+        status.className = 'file-status err';
+        status.textContent = '❌ Could not read any student names from ' + file.name + '. Check the file has a name column and try again.';
+        refreshPreview(); renderAIPanel(); return;
+      }
       document.getElementById('edit'+k).value = names.join('\n');
       window.groupRecords[k] = records;
-      if (names.length){
-        status.className = 'file-status ok';
-        const extras = detectAttrKeys(records);
-        status.textContent = `✅ ${names.length} students${extras.length ? ' • columns: ' + extras.join(', ') : ''}`;
-      } else {
-        status.className = 'file-status err';
-        status.textContent = '⚠ No names detected';
-      }
+      window.groupMeta[k] = {filename: file.name, fileTags: parseFileTags(file.name, document.getElementById('stream'+k).value)};
+      status.className = 'file-status ok';
+      const cols = (catLabels||[]).filter(l=>l!=='Roll Number' && l!=='Name');
+      status.textContent = `✅ ${names.length} students${cols.length ? ' • columns: ' + cols.join(', ') : ''}`;
     }catch(err){
-      window.groupRecords[k] = [];
+      window.groupRecords[k] = []; window.groupMeta[k] = {};
       status.className = 'file-status err';
-      status.textContent = '❌ Error: ' + err.message;
+      status.textContent = '❌ Error reading ' + file.name + ': ' + err.message;
     }
     refreshPreview(); renderAIPanel();
   });
-}
-
-function detectAttrKeys(records){
-  const keys = new Set();
-  for (const r of records) for (const k of Object.keys(r.attrs)) keys.add(k);
-  return [...keys];
 }
 
 function updateCounts(){
@@ -571,76 +651,120 @@ function refreshPreview(){
 }
 function namesFromEditor(k){ return cleanNames(document.getElementById('edit'+k).value.split('\n')); }
 
-/* ================= the "AI": detect jumbling criteria ================= */
-
-// Look across everything the teacher uploaded and work out which attributes
-// actually distinguish students — those are the valid ways to jumble.
-function detectCriteria(){
-  const keyVals = new Map();   // key -> Map(value -> count)
-  let total = 0;
-  for (const k of ['A','B','C']){
-    for (const rec of (window.groupRecords[k] || [])){
-      total++;
-      for (const [key,val] of Object.entries(rec.attrs)){
-        if (!keyVals.has(key)) keyVals.set(key, new Map());
-        const m = keyVals.get(key);
-        m.set(val, (m.get(val)||0)+1);
-      }
-    }
-  }
-  const criteria = [];
-  for (const [key,valMap] of keyVals){
-    const distinct = valMap.size;
-    const withVal = [...valMap.values()].reduce((a,b)=>a+b,0);
-    const coverage = total ? withVal/total : 0;
-    if (distinct < 2 || distinct > 12 || coverage < 0.4) continue; // not a useful split
-
-    const vals = [...valMap.keys()];
-    const langShare = vals.filter(x=>LANGS.test(x)).length / vals.length;
-    let label = key;
-    if (langShare >= 0.5 && !/lang/i.test(key)) label = '2nd Language';
-
-    // score: exam-relevant name + balanced distribution + reasonable spread
-    let score = 0;
-    if (/stream|group|section|lang|medium|subject|elective|second|paper/i.test(key) || langShare>=0.5) score += 100;
-    const counts = [...valMap.values()];
-    const max = Math.max(...counts), sum = counts.reduce((a,b)=>a+b,0);
-    score += (1 - max/sum) * 50;
-    score += Math.min(distinct, 5);
-
-    criteria.push({key, label, values: vals, counts: valMap, coverage, score});
-  }
-  criteria.sort((a,b)=>b.score-a.score);
-  return {criteria, total};
-}
+/* ================= the AI: dynamic grouping analysis =================
+   Nothing is assumed. We look at every student the teacher actually uploaded,
+   collect candidate categories from BOTH the columns inside the sheets and the
+   filenames of multiple uploads, keep only those that genuinely separate
+   students, then rank them. The ranking is advisory — Classic stays default. */
 
 function groupsWithNames(){ return ['A','B','C'].filter(k=>namesFromEditor(k).length); }
 
-// One source of truth for "how could we jumble?" — used by the AI panel
-// and by the ask-me-first modal.
+// name(lower) -> that student's canonical category values (from columns)
+function attrIndex(){
+  const idx = new Map();
+  for (const k of ['A','B','C']) for (const rec of (window.groupRecords[k]||[])){
+    const cats = rec.cats || rec.attrs || {};
+    idx.set(String(rec.name).toLowerCase(), cats);
+    if (rec.plain) idx.set(String(rec.plain).toLowerCase(), cats);
+  }
+  return idx;
+}
+
+// The whole analysis. Returns detected categories (ranked), the recommendation,
+// and per-category resolvers so jumbling can look up a student's value.
+function analyze(){
+  const groups = groupsWithNames();
+  const total = groups.reduce((n,k)=>n+namesFromEditor(k).length, 0);
+  if (!total) return {total:0, groups, categories:[], recommended:null};
+
+  const idx = attrIndex();
+  // resolver: a student's value for a category, column-first then file-level.
+  const colValue  = (name)      => (idx.get(String(name).toLowerCase())||{});
+  const fileTags  = (k)         => ((window.groupMeta[k]||{}).fileTags || {});
+
+  // 1. gather candidate labels from columns and (if 2+ files) from filenames
+  const labels = new Set();
+  for (const k of groups){
+    for (const name of namesFromEditor(k)) for (const l of Object.keys(colValue(name))) labels.add(l);
+  }
+  if (groups.length >= 2) for (const k of groups) for (const l of Object.keys(fileTags(k))) labels.add(l);
+  labels.delete('Roll Number'); labels.delete('Name');
+
+  // 2. for each label, resolve every student's value, decide column vs file source
+  const categories = [];
+  for (const label of labels){
+    const perStudent = [];   // {k, name, val}
+    let fromCol = 0;
+    for (const k of groups){
+      const ftag = fileTags(k)[label];
+      for (const name of namesFromEditor(k)){
+        let val = colValue(name)[label];
+        if (val){ fromCol++; } else if (ftag){ val = ftag; }
+        perStudent.push({k, name, val: val || null});
+      }
+    }
+    const source = fromCol >= total*0.4 ? 'column' : 'file';
+    const counts = new Map();
+    let covered = 0;
+    for (const s of perStudent){ if (s.val){ covered++; counts.set(s.val,(counts.get(s.val)||0)+1); } }
+    const distinct = counts.size;
+    const coverage = covered/total;
+
+    // validity: must actually split students, cover enough of them, and not be
+    // an id-like column where (nearly) every student is unique.
+    if (distinct < 2) continue;
+    if (coverage < 0.4) continue;
+    if (distinct > Math.max(2, Math.min(15, total*0.6))) continue;
+
+    const def = categoryDef(label);
+    const weight = def ? def.weight : 0.45;
+    const reason = def ? def.reason : `separates students by ${label}`;
+    const maxCount = Math.max(...counts.values());
+    const balance = 1 - (maxCount/covered);        // 0 = all one value, →1 = even
+    // collision probability ≈ chance two random students share the value
+    let collision = 0; for (const c of counts.values()) collision += (c/covered)**2;
+
+    // priority: (1) more unique values (2) balance (3) low collision (4) exam weight
+    const normDistinct = Math.min(distinct,8)/8;
+    const score = 0.34*normDistinct + 0.24*balance + 0.16*(1-collision) + 0.26*weight;
+
+    categories.push({
+      key: (source==='file'?'file:':'col:')+label,
+      label, source, distinct, coverage, balance, collision, weight, reason, score,
+      values: [...counts.keys()],
+      resolve: (name,k)=> colValue(name)[label] || fileTags(k)[label] || 'Unassigned'
+    });
+  }
+
+  categories.sort((a,b)=> b.score-a.score || b.distinct-a.distinct || b.weight-a.weight);
+  return {total, groups, categories, recommended: categories[0] || null};
+}
+
+function categoryByKey(key){ return analyze().categories.find(c=>c.key===key) || null; }
+
+// One source of truth for the jumble options. The DEFAULT selected option is
+// ALWAYS Classic; the AI recommendation is surfaced only as a badge/reasoning.
+function classicOption(groups){
+  return {id:'group', title:'Classic — mix all uploaded groups evenly',
+    vals: groups.length>1
+      ? 'alternates students from every uploaded list'
+      : 'shuffles everyone within the single list'};
+}
 function buildBasisOptions(){
   const groups = groupsWithNames();
-  // AI off → no column detection, no recommendations: classic mode only.
+  // AI off → no detection, no recommendations: Classic only.
   if (!window.aiEnabled){
     const total = groups.reduce((n,k)=>n+namesFromEditor(k).length, 0);
-    const groupLabels = groups.map(streamLabel);
-    return {options:[{id:'group', title:'Classic — one from each uploaded group',
-      vals: groups.length>1 ? groupLabels.join(', ') : 'only one group uploaded — jumbles within it',
-      key:'group'}], recoId:'group', criteria:[], total, groups};
+    return {options:[classicOption(groups)], recoId:null, categories:[], total, groups, recommended:null};
   }
-  const {criteria, total} = detectCriteria();
-  const options = [];
-  criteria.forEach(c=>{
+  const {categories, total, recommended} = analyze();
+  const options = [classicOption(groups)];        // Classic first & default
+  categories.forEach(c=>{
     const preview = c.values.slice(0,6).join(', ') + (c.values.length>6 ? ', …' : '');
-    options.push({id:'attr:'+c.key, title:'Jumble by ' + c.label,
-      vals:`${c.values.length} groups — ${preview}`, key:c.key});
+    options.push({id:c.key, title:'Jumble by ' + c.label,
+      vals:`${c.values.length} ${c.label.toLowerCase()} groups — ${preview}`, key:c.key});
   });
-  const groupLabels = groups.map(streamLabel);
-  options.push({id:'group', title:'Classic — one from each uploaded group',
-    vals: groups.length>1 ? groupLabels.join(', ') : 'only one group uploaded — jumbles within it',
-    key:'group'});
-  const recoId = criteria.length ? 'attr:'+criteria[0].key : 'group';
-  return {options, recoId, criteria, total, groups};
+  return {options, recoId: recommended ? recommended.key : null, categories, total, groups, recommended};
 }
 
 function optionHTML(o, currentId, recoId, radioName){
@@ -655,44 +779,61 @@ function optionHTML(o, currentId, recoId, radioName){
 
 function renderAIPanel(){
   const panel = document.getElementById('aiPanel');
+  // Show NOTHING until at least one file is parsed successfully (and AI is on).
   const anyData = groupsWithNames().length > 0;
   if (!anyData || !window.aiEnabled){ panel.style.display='none'; return; }
   panel.style.display = '';
 
-  const {options, recoId, criteria, total, groups} = buildBasisOptions();
-  const opts = document.getElementById('aiOptions');
+  const {options, recoId, categories, total} = buildBasisOptions();
 
-  // Until the teacher explicitly picks a basis, follow the recommendation.
+  // Selection defaults to Classic and only moves when the teacher chooses.
   const validIds = new Set(options.map(o=>o.id));
-  let currentId = window.jumbleBasis === 'group' ? 'group' : 'attr:'+window.jumbleBasis;
-  if (!window._basisUserChosen || !validIds.has(currentId)) currentId = recoId;
-  window.jumbleBasis = currentId === 'group' ? 'group' : currentId.slice(5);
+  let currentId = window.jumbleBasis === 'group' ? 'group' : window.jumbleBasis;
+  if (!window._basisUserChosen || !validIds.has(currentId)) currentId = 'group';
+  window.jumbleBasis = currentId;
 
-  // Summary line — the AI explaining what it found and what it recommends.
-  const summary = document.getElementById('aiSummary');
-  if (criteria.length){
-    const reco = criteria[0];
-    summary.innerHTML = `I read <strong>${total}</strong> students and found these ways to jumble them. `
-      + `I recommend <strong>${reco.label}</strong> — that keeps students writing the same `
-      + `${reco.label.toLowerCase()} paper off the same bench. Pick a different basis if you like.`;
+  // --- Detected categories (only ones that actually exist) ---
+  const det = document.getElementById('aiDetected');
+  if (categories.length){
+    det.innerHTML = '<div class="ai-label">Detected categories</div>'
+      + '<div class="ai-chips">'
+      + categories.map(c=>`<span class="ai-chip" title="${c.distinct} groups, ${Math.round(c.coverage*100)}% covered">${escapeHtml(c.label)} <b>×${c.distinct}</b>`
+          + `<span class="ai-src">${c.source==='file'?'from files':'from column'}</span></span>`).join('')
+      + '</div>';
   } else {
-    summary.innerHTML = groups.length>1
-      ? `Your files have no extra columns like stream or second language, so I’ll jumble by the <strong>${groups.length} groups</strong> you uploaded (one from each per bench).`
-      : `I found one plain list with no stream / language columns, so I’ll simply shuffle everyone within it.`;
+    det.innerHTML = '<div class="ai-label">Detected categories</div>'
+      + `<p class="ai-none">No separating categories found in the upload${groupsWithNames().length>1?'s':''} — only Classic mixing is available.</p>`;
   }
 
-  opts.innerHTML = options.map(o=>optionHTML(o, currentId, recoId, 'basis')).join('');
+  // --- Recommendation + reasoning (informational; NOT auto-selected) ---
+  const reco = document.getElementById('aiReco');
+  if (categories.length){
+    const r = categories[0];
+    const order = categories.map((c,i)=>`<li><strong>${escapeHtml(c.label)}</strong> — ${c.reason}</li>`).join('');
+    reco.innerHTML = `<div class="ai-label">Recommended</div>`
+      + `<p>From <strong>${total}</strong> students I’d jumble by <strong>${escapeHtml(r.label)}</strong> first. `
+      + `It’s only a suggestion — <strong>Classic stays selected</strong> until you switch.</p>`
+      + `<ol class="ai-order">${order}</ol>`;
+  } else {
+    reco.innerHTML = '';
+  }
+
+  document.getElementById('aiModesLabel').style.display = '';
+  document.getElementById('aiOptions').innerHTML =
+    options.map(o=>optionHTML(o, currentId, recoId, 'basis')).join('');
 }
 
 /* ---------- ask-me-first modal ---------- */
 
 function openBasisModal(){
-  const {options, recoId, total} = buildBasisOptions();
-  const currentId = window.jumbleBasis === 'group' ? 'group' : 'attr:'+window.jumbleBasis;
-  const startId = options.some(o=>o.id===currentId) && window._basisUserChosen ? currentId : recoId;
+  const {options, recoId, total, recommended} = buildBasisOptions();
+  // Classic is ALWAYS the pre-selected option; the recommendation is only badged.
+  const startId = (window._basisUserChosen && options.some(o=>o.id===window.jumbleBasis)) ? window.jumbleBasis : 'group';
   document.getElementById('basisModalIntro').innerHTML =
-    `I read <strong>${total}</strong> students and found more than one way to jumble them. `
-    + `Pick the basis — students sharing it will never sit together.`;
+    `I read <strong>${total}</strong> students. `
+    + (recommended
+        ? `<strong>Classic</strong> is selected by default. If you prefer, I suggest jumbling by <strong>${escapeHtml(recommended.label)}</strong> — pick a basis below.`
+        : `I found no separating categories, so I’ll mix everyone with Classic.`);
   document.getElementById('basisModalOptions').innerHTML =
     options.map(o=>optionHTML(o, startId, recoId, 'modalBasis')).join('');
   document.getElementById('basisModal').style.display = 'flex';
@@ -708,7 +849,7 @@ document.getElementById('basisConfirmBtn').addEventListener('click', ()=>{
   const picked = document.querySelector('#basisModalOptions input[name=modalBasis]:checked');
   if (picked){
     window._basisUserChosen = true;
-    window.jumbleBasis = picked.value === 'group' ? 'group' : picked.value.slice(5);
+    window.jumbleBasis = picked.value;
   }
   document.getElementById('basisModal').style.display = 'none';
   renderAIPanel(); renderJumble();
@@ -725,8 +866,8 @@ document.getElementById('aiOptions').addEventListener('change', e=>{
   if (e.target.name !== 'basis') return;
   const id = e.target.value;
   window._basisUserChosen = true;
-  window.jumbleBasis = id === 'group' ? 'group' : id.slice(5);
-  document.querySelectorAll('.ai-opt').forEach(el=>el.classList.toggle('sel', el.dataset.id===id));
+  window.jumbleBasis = id;
+  document.querySelectorAll('#aiOptions .ai-opt').forEach(el=>el.classList.toggle('sel', el.dataset.id===id));
   // if a chart is already showing, re-jumble immediately with the new basis
   if (document.getElementById('resultTable').style.display !== 'none') renderJumble();
 });
@@ -751,16 +892,6 @@ function seatInner(name, tag){
 }
 function renderSeat(td){ td.innerHTML = seatInner(td.dataset.name, td.dataset.tag); }
 
-// Look up a student's attributes (by name) from the uploaded records.
-function attrIndex(){
-  const idx = new Map();
-  for (const k of ['A','B','C']) for (const rec of (window.groupRecords[k]||[])){
-    idx.set(rec.name.toLowerCase(), rec.attrs);
-    idx.set(rec.plain.toLowerCase(), rec.attrs);
-  }
-  return idx;
-}
-
 // Build the pools that mixed-mode draws from, based on the chosen basis.
 // Each pool = {tag, q:[names]}. Mixed mode puts one from each pool per bench.
 function buildPools(){
@@ -770,17 +901,18 @@ function buildPools(){
       .map(k=>({tag: streamLabel(k), q: shuffle(namesFromEditor(k))}))
       .filter(p=>p.q.length);
   }
-  const idx = attrIndex();
+  const cat = categoryByKey(basis);
+  if (!cat){   // basis no longer valid (e.g. list edited) → fall back to classic
+    return ['A','B','C'].map(k=>({tag: streamLabel(k), q: shuffle(namesFromEditor(k))})).filter(p=>p.q.length);
+  }
   const byVal = new Map();
   for (const k of ['A','B','C']){
     for (const name of namesFromEditor(k)){
-      const attrs = idx.get(name.toLowerCase()) || {};
-      const val = attrs[basis] || 'Unassigned';
+      const val = cat.resolve(name, k);
       if (!byVal.has(val)) byVal.set(val, []);
       byVal.get(val).push(name);
     }
   }
-  // biggest pools first so the sort in the fill loop is stable
   return [...byVal.entries()]
     .sort((a,b)=>b[1].length-a[1].length)
     .map(([tag,arr])=>({tag, q: shuffle(arr)}));
@@ -789,12 +921,10 @@ function buildPools(){
 // Human-readable name of the current basis, for badges in the mode display.
 function basisLabel(){
   if (window.jumbleBasis === 'group'){
-    const gs = groupsWithNames();
-    return gs.length>1 ? 'group' : 'list';
+    return groupsWithNames().length>1 ? 'group' : 'list';
   }
-  const {criteria} = detectCriteria();
-  const c = criteria.find(x=>x.key===window.jumbleBasis);
-  return c ? c.label : window.jumbleBasis;
+  const cat = categoryByKey(window.jumbleBasis);
+  return cat ? cat.label : 'group';
 }
 
 function renderJumble(){
