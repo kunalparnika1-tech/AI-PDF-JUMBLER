@@ -142,6 +142,31 @@
   .swap-hint{font-size:.8rem;color:#666;margin-top:.5rem;text-align:center;}
   .mode-badge{display:inline-block;background:#2575fc;color:#fff;padding:.2rem .8rem;border-radius:20px;
     font-size:.75rem;font-weight:600;margin-left:.5rem;animation:tagPop .35s cubic-bezier(.34,1.56,.64,1);}
+
+  /* summary bar */
+  .summary-bar{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;margin-top:1.5rem;
+    animation:cardIn .5s cubic-bezier(.22,1,.36,1);}
+  .summary-bar .stat{display:inline-flex;align-items:baseline;gap:.35rem;background:#f4f6ff;
+    border:1px solid #e0e6ff;border-radius:30px;padding:.4rem .95rem;font-size:.9rem;font-weight:600;color:#333;}
+  .summary-bar .stat b{font-size:1.15rem;color:var(--violet);}
+  .summary-bar .stat.ok b{color:#0a7a3d;}
+  .summary-bar .stat.warn b{color:#c0392b;}
+  .summary-bar .stat.ok{background:#e7fbf0;border-color:#b6ecca;}
+  .summary-bar .stat.warn{background:#ffecec;border-color:#f6bcbc;}
+
+  /* dev dashboard */
+  .dev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.7rem;margin:.8rem 0;}
+  .dev-card{background:#f4f6ff;border-radius:.7rem;padding:.7rem .9rem;text-align:center;}
+  .dev-card .n{font-size:1.5rem;font-weight:700;color:var(--violet);display:block;}
+  .dev-card .l{font-size:.72rem;color:#666;text-transform:uppercase;letter-spacing:.4px;}
+  .dev-bars{margin:.4rem 0 .8rem;}
+  .dev-bar{display:flex;align-items:center;gap:.5rem;margin:.25rem 0;font-size:.82rem;}
+  .dev-bar .lab{flex:0 0 120px;text-align:right;color:#555;}
+  .dev-bar .track{flex:1;background:#eceefb;border-radius:20px;overflow:hidden;height:14px;}
+  .dev-bar .fill{height:100%;background:linear-gradient(90deg,var(--violet),var(--blue));border-radius:20px;}
+  .dev-bar .val{flex:0 0 34px;font-weight:600;color:#444;}
+  .dev-recent{max-height:150px;overflow-y:auto;font-size:.76rem;border-top:1px solid #eee;margin-top:.5rem;}
+  .dev-recent div{padding:.2rem 0;border-bottom:1px solid #f2f2f2;color:#555;font-family:monospace;}
   .toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;
     background:rgba(255,255,255,0.85);padding:0.5rem 1rem;border-radius:0.8rem;margin-top:1.5rem;gap:.6rem;}
   .toolbar-right{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;}
@@ -176,6 +201,12 @@
     .toolbar{background:rgba(30,32,48,0.85);}
     .names-count,.swap-hint{color:#99a;}
     .print-header p{color:#aab;}
+    .summary-bar .stat{background:#23253a;border-color:#3a3d5c;color:#dcd6f5;}
+    .summary-bar .stat.ok{background:#14321f;border-color:#1f6b3d;}
+    .summary-bar .stat.warn{background:#3a1a1a;border-color:#6b2f2f;}
+    .dev-card{background:#23253a;}.dev-card .l{color:#9aa;}
+    .dev-bar .track{background:#2a2d44;}.dev-bar .lab,.dev-bar .val{color:#bbc;}
+    .dev-recent div{color:#99a;border-color:#2a2d44;}
   }
   @media (max-width:640px){
     main.container{padding:1rem;margin-top:1rem;}
@@ -293,6 +324,8 @@
       <p id="phMeta"></p>
     </div>
 
+    <div class="summary-bar" id="summaryBar" style="display:none;"></div>
+
     <table id="resultTable" style="display:none;">
       <thead><tr><th>Bench #</th><th>Seat 1</th><th>Seat 2</th></tr></thead>
       <tbody></tbody>
@@ -304,8 +337,8 @@
       <div class="toolbar-right">
         <button id="toggleModeBtn" class="toggle-btn" style="display:none;">🔄 Jumble within one group</button>
         <button id="reshuffleBtn">🔀 Re-Jumble</button>
-        <button id="exportXlsxBtn">⬇ Export Excel</button>
-        <button id="exportBtn">⬇ Export CSV</button>
+        <button id="exportStudentBtn" title="Clean chart for students — names only">⬇ Students</button>
+        <button id="exportInvigBtn" title="Teacher copy — includes roll no. &amp; group">⬇ Invigilator</button>
         <button id="printBtn">🖨 Print</button>
       </div>
     </div>
@@ -320,6 +353,21 @@
     <div class="modal-actions">
       <button type="button" class="ghost" id="basisCancelBtn">Cancel</button>
       <button type="button" id="basisConfirmBtn">✨ Jumble</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="devModal" style="display:none;">
+  <div class="modal-box" style="max-width:680px;">
+    <h4>🛠 Developer Dashboard <span style="font-size:.6rem;font-weight:700;background:#e8b33a;color:#000;padding:.1rem .5rem;border-radius:10px;vertical-align:middle;">BETA · LOCAL</span></h4>
+    <p style="font-size:.8rem;">Anonymous usage from <strong>this device only</strong> — no names or file contents are ever recorded (see Article&nbsp;P). Nothing leaves the browser.</p>
+    <div id="devStats"></div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <div style="display:flex;gap:.5rem;">
+        <button type="button" class="ghost" id="devExportBtn" style="padding:.5rem 1rem;">⬇ Export JSON</button>
+        <button type="button" class="ghost" id="devClearBtn" style="padding:.5rem 1rem;">🗑 Reset</button>
+      </div>
+      <button type="button" id="devCloseBtn">Close</button>
     </div>
   </div>
 </div>
@@ -597,10 +645,110 @@ function updateAIToggle(){
 
 document.getElementById('aiToggleBtn').addEventListener('click', ()=>{
   window.aiEnabled = !window.aiEnabled;
+  track('ai_toggle', {value: window.aiEnabled ? 'on' : 'off'});
   try{ localStorage.setItem(AI_KEY, window.aiEnabled ? 'on' : 'off'); }catch(e){}
   if (!window.aiEnabled){ window.jumbleBasis = 'group'; window._basisUserChosen = false; }
   updateAIToggle(); renderAIPanel();
   if (document.getElementById('resultTable').style.display !== 'none') renderJumble();
+});
+
+/* ================= privacy-safe analytics (Article P) =================
+   Records ONLY anonymous usage metadata — counts, choices, timestamps and a
+   random device id. Never names, roll numbers, filenames or file contents.
+   Stays on this device (localStorage). No network calls unless the developer
+   later sets ANALYTICS_ENDPOINT, and even then only these metadata fields go. */
+const ANALYTICS_KEY = 'jumbler-analytics-v1';
+const ANALYTICS_ENDPOINT = '';   // leave '' = fully local. Set to a collector URL to opt-in to remote (metadata only).
+
+function deviceId(){
+  try{
+    let id = localStorage.getItem('jumbler-device');
+    if (!id){ id = 'd_' + Math.random().toString(36).slice(2,10); localStorage.setItem('jumbler-device', id); }
+    return id;
+  }catch(e){ return 'd_anon'; }
+}
+function loadEvents(){ try{ return JSON.parse(localStorage.getItem(ANALYTICS_KEY)) || []; }catch(e){ return []; } }
+function track(type, data){
+  // Whitelist: only primitive counts/labels are allowed through — a guard so
+  // no personal data can ever accidentally be logged.
+  const safe = {};
+  const ALLOW = ['students','benches','clashes','groups','basis','mode','role','source','hasColumns','categories','value'];
+  for (const kk of ALLOW) if (data && data[kk] !== undefined){
+    const val = data[kk];
+    safe[kk] = (typeof val === 'number' || typeof val === 'boolean') ? val : String(val).slice(0,40);
+  }
+  const ev = {t:type, ...safe, ts:Date.now(), dev:deviceId()};
+  try{
+    const all = loadEvents(); all.push(ev);
+    localStorage.setItem(ANALYTICS_KEY, JSON.stringify(all.slice(-800)));
+  }catch(e){}
+  if (ANALYTICS_ENDPOINT){
+    try{ navigator.sendBeacon(ANALYTICS_ENDPOINT, JSON.stringify(ev)); }catch(e){}
+  }
+}
+track('app_open', {});
+
+/* ---------- developer dashboard (hidden: Ctrl+Shift+D or #dev) ---------- */
+
+function renderDevDashboard(){
+  const ev = loadEvents();
+  const jumbles = ev.filter(e=>e.t==='jumble');
+  const exports = ev.filter(e=>e.t==='export');
+  const opens = ev.filter(e=>e.t==='app_open');
+  const sessions = new Set(ev.map(e=>e.ts && new Date(e.ts).toDateString()+e.dev)).size;
+  const totalStudents = jumbles.reduce((n,e)=>n+(e.students||0),0);
+  const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0;
+  const clean = jumbles.filter(e=>(e.clashes||0)===0).length;
+
+  // basis usage breakdown
+  const basisCount = {};
+  jumbles.forEach(e=>{ const b=e.basis||'—'; basisCount[b]=(basisCount[b]||0)+1; });
+  const maxB = Math.max(1, ...Object.values(basisCount));
+  const bars = Object.entries(basisCount).sort((a,b)=>b[1]-a[1]).map(([b,n])=>
+    `<div class="dev-bar"><span class="lab">${escapeHtml(b)}</span>`
+    + `<span class="track"><span class="fill" style="width:${Math.round(n/maxB*100)}%"></span></span>`
+    + `<span class="val">${n}</span></div>`).join('') || '<p class="ai-none">No jumbles yet.</p>';
+
+  const recent = ev.slice(-14).reverse().map(e=>{
+    const time = new Date(e.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    const bits = Object.entries(e).filter(([k])=>!['t','ts','dev'].includes(k)).map(([k,v])=>`${k}=${v}`).join(' ');
+    return `<div>${time} · <b>${e.t}</b> ${escapeHtml(bits)}</div>`;
+  }).join('') || '<div>No events.</div>';
+
+  document.getElementById('devStats').innerHTML =
+    `<div class="dev-grid">
+      <div class="dev-card"><span class="n">${jumbles.length}</span><span class="l">Jumbles</span></div>
+      <div class="dev-card"><span class="n">${opens.length}</span><span class="l">Opens</span></div>
+      <div class="dev-card"><span class="n">${sessions}</span><span class="l">Sessions</span></div>
+      <div class="dev-card"><span class="n">${exports.length}</span><span class="l">Exports</span></div>
+      <div class="dev-card"><span class="n">${avg(jumbles.map(e=>e.students||0))}</span><span class="l">Avg students</span></div>
+      <div class="dev-card"><span class="n">${avg(jumbles.map(e=>e.benches||0))}</span><span class="l">Avg benches</span></div>
+      <div class="dev-card"><span class="n">${jumbles.length?Math.round(clean/jumbles.length*100):0}%</span><span class="l">Clash-free</span></div>
+      <div class="dev-card"><span class="n">${totalStudents}</span><span class="l">Students jumbled</span></div>
+    </div>
+    <div class="ai-label">How they jumble</div>
+    <div class="dev-bars">${bars}</div>
+    <div class="ai-label">Recent activity</div>
+    <div class="dev-recent">${recent}</div>`;
+}
+function openDevDashboard(){ renderDevDashboard(); document.getElementById('devModal').style.display='flex'; }
+
+document.addEventListener('keydown', e=>{
+  if (e.ctrlKey && e.shiftKey && (e.key==='D'||e.key==='d')){ e.preventDefault(); openDevDashboard(); }
+});
+if (location.hash==='#dev' || /[?&]dev=1/.test(location.search)) setTimeout(openDevDashboard, 300);
+
+document.getElementById('devCloseBtn').addEventListener('click', ()=>{ document.getElementById('devModal').style.display='none'; });
+document.getElementById('devModal').addEventListener('click', e=>{ if (e.target.id==='devModal') e.currentTarget.style.display='none'; });
+document.getElementById('devClearBtn').addEventListener('click', ()=>{
+  if (!confirm('Reset all local analytics on this device?')) return;
+  try{ localStorage.removeItem(ANALYTICS_KEY); }catch(e){}
+  renderDevDashboard();
+});
+document.getElementById('devExportBtn').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(loadEvents(),null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='jumbler-analytics.json'; a.click(); URL.revokeObjectURL(a.href);
 });
 
 /* ================= upload handling ================= */
@@ -626,6 +774,7 @@ for (const k of ['A','B','C']){
       status.className = 'file-status ok';
       const cols = (catLabels||[]).filter(l=>l!=='Roll Number' && l!=='Name');
       status.textContent = `✅ ${names.length} students${cols.length ? ' • columns: ' + cols.join(', ') : ''}`;
+      track('file_parsed', {students:names.length, hasColumns: cols.length>0, categories: cols.length});
     }catch(err){
       window.groupRecords[k] = []; window.groupMeta[k] = {};
       status.className = 'file-status err';
@@ -992,7 +1141,33 @@ function renderJumble(){
   document.getElementById('swapHint').style.display = window.currentMode==='mixed' ? '' : 'none';
   document.getElementById('tools').style.display='flex';
   updateModeDisplay();
+  updateSummaryBar(benches);
   document.getElementById('resultTable').scrollIntoView({behavior:'smooth'});
+
+  const clashes = document.querySelectorAll('#resultTable tr.clash').length;
+  const totalStudents = groupsWithNames().reduce((n,k)=>n+namesFromEditor(k).length,0);
+  track('jumble', {students:totalStudents, benches, clashes, groups:groupsWithNames().length,
+    basis: basisLabel(), mode: window.currentMode});
+}
+
+// Live summary line above the chart: students · benches · unseated · clashes · basis.
+function updateSummaryBar(benches){
+  const bar = document.getElementById('summaryBar');
+  if (benches === undefined) benches = document.querySelectorAll('#resultTable tbody tr:not(.unseated)').length;
+  const total = groupsWithNames().reduce((n,k)=>n+namesFromEditor(k).length,0);
+  const seated = [...document.querySelectorAll('#resultTable td.seat')]
+    .filter(td=>td.dataset.name && td.dataset.name!=='—').length;
+  const unseated = Math.max(0, total - seated);
+  const clashes = document.querySelectorAll('#resultTable tr.clash').length;
+  const mixed = window.currentMode==='mixed';
+  const stat = (cls,label,val)=>`<span class="stat ${cls}"><b>${val}</b> ${label}</span>`;
+  bar.innerHTML =
+    stat('', 'students', total)
+    + stat('', benches===1?'bench':'benches', benches)
+    + (unseated ? stat('warn','unseated',unseated) : stat('ok','all seated','✓'))
+    + (mixed ? (clashes ? stat('warn','clashes',clashes) : stat('ok','clashes',0)) : '')
+    + `<span class="stat">by <b style="font-size:.9rem;">${escapeHtml(basisLabel())}</b></span>`;
+  bar.style.display='flex';
 }
 
 function updateModeDisplay(){
@@ -1028,6 +1203,7 @@ function swapSeats(a,b){
   a.dataset.name=b.dataset.name; a.dataset.tag=b.dataset.tag;
   b.dataset.name=an; b.dataset.tag=at;
   renderSeat(a); renderSeat(b); markClashes();
+  if (document.getElementById('summaryBar').style.display!=='none') updateSummaryBar();
 }
 function markClashes(){
   document.querySelectorAll('#resultTable tbody tr').forEach(tr=>{
@@ -1059,31 +1235,37 @@ table.addEventListener('drop', e=>{
 
 /* ================= export ================= */
 
-function chartToRows(){
+// role='student' → clean names only (name, no group tag).
+// role='invigilator' → name + group/stream tag for supervision.
+function chartToRows(role){
   const out=[];
   document.querySelectorAll('#resultTable thead tr, #resultTable tbody tr').forEach(tr=>{
     out.push([...tr.children].map(td=>{
       if (td.classList.contains('seat')){
         const name = td.dataset.name || '—';
         if (!name || name==='—') return '—';
-        return td.dataset.tag ? `${name} (${td.dataset.tag})` : name;
+        return (role==='invigilator' && td.dataset.tag) ? `${name} (${td.dataset.tag})` : name;
       }
       return td.textContent;
     }));
   });
   return out;
 }
-document.getElementById('exportBtn').addEventListener('click', ()=>{
-  const csv = chartToRows().map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
-  const link=document.createElement('a'); link.href=URL.createObjectURL(blob);
-  link.download='seating_chart.csv'; link.click(); URL.revokeObjectURL(link.href);
-});
-document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
+function exportXlsx(role){
+  const rows = chartToRows(role);
+  const school = v('schoolName').trim(), exam = v('examTitle').trim();
+  const head = [];
+  if (school) head.push([school]);
+  if (exam) head.push([exam]);
+  head.push([`Seating Chart • ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})} • ${role==='invigilator'?'Invigilator copy':'Student copy'}`]);
+  head.push([]);
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(chartToRows()), 'Seating Chart');
-  XLSX.writeFile(wb,'seating_chart.xlsx');
-});
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...head, ...rows]), 'Seating Chart');
+  XLSX.writeFile(wb, role==='invigilator' ? 'seating_invigilator.xlsx' : 'seating_students.xlsx');
+  track('export', {role});
+}
+document.getElementById('exportStudentBtn').addEventListener('click', ()=>exportXlsx('student'));
+document.getElementById('exportInvigBtn').addEventListener('click', ()=>exportXlsx('invigilator'));
 document.getElementById('printBtn').addEventListener('click', ()=>window.print());
 
 updateAIToggle();
