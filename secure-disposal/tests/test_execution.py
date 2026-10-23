@@ -203,6 +203,72 @@ def test_reverify_mismatch_blocks_real(config, monkeypatch):
     assert op.result["executed"] is False  # replacement detected -> downgraded
 
 
+def _elevate(monkeypatch):
+    import disposal.execution as ex
+    monkeypatch.setattr(ex.priv, "detect", lambda: ex.priv.PrivilegeReport(
+        platform="Linux", is_elevated=True, uid=0, euid=0, user="root", notes=[]))
+    monkeypatch.setattr(ex.priv, "missing_requirements",
+                        lambda cap, report=None: [])
+
+
+class _NvmeFake(RealCommandRunner):
+    """Returns a chosen sanitize-log for the verify command; success for erase."""
+    def __init__(self, sanitize_log):
+        self.sanitize_log = sanitize_log
+
+    def run(self, command, timeout):
+        from disposal.execution import CommandResult
+        if "sanitize-log" in command:
+            return CommandResult(command=command, executed=True, returncode=0,
+                                 stdout=self.sanitize_log)
+        return CommandResult(command=command, executed=True, returncode=0,
+                             stdout="")
+
+
+def _nvme_setup(config, monkeypatch):
+    config.allow_real_execution = True
+    monkeypatch.setenv("DISPOSAL_ALLOW_REAL_EXECUTION", "yes")
+    _elevate(monkeypatch)
+    engine, store = _engine(config)
+    d = _drive(tech="SSD-NVMe", serial="NV1")
+    adapter = NvmeFormatAdapter()
+    op = _op(adapter, d)
+    store.run.operations.append(op)
+    return engine, d, adapter, op
+
+
+def test_engine_claims_erased_on_completed_sanitize_log(config, monkeypatch):
+    engine, d, adapter, op = _nvme_setup(config, monkeypatch)
+    log = "Sanitize Progress (SPROG): 65535\nSanitize Status (SSTAT): 0x101\n"
+    engine.execute_operation(op, d, adapter, _auth(), _target(d),
+                             runner=_NvmeFake(log),
+                             confirm_fn=lambda prompt: d.serial)
+    assert op.result["verification_level"] == "independently_verified"
+    assert op.result["data_erased_claim"] is True
+    assert op.state == OpState.SUCCEEDED.value
+
+
+def test_engine_no_claim_and_manual_review_on_failed_log(config, monkeypatch):
+    engine, d, adapter, op = _nvme_setup(config, monkeypatch)
+    log = "Sanitize Status (SSTAT): 0x103\n"       # failed
+    engine.execute_operation(op, d, adapter, _auth(), _target(d),
+                             runner=_NvmeFake(log),
+                             confirm_fn=lambda prompt: d.serial)
+    assert op.result["data_erased_claim"] is False
+    assert op.result["verification"]["conflicts"]
+    assert op.state == OpState.NEEDS_MANUAL_REVIEW.value
+
+
+def test_engine_no_claim_on_inprogress_log(config, monkeypatch):
+    engine, d, adapter, op = _nvme_setup(config, monkeypatch)
+    log = "Sanitize Status (SSTAT): 0x102\n"       # in progress
+    engine.execute_operation(op, d, adapter, _auth(), _target(d),
+                             runner=_NvmeFake(log),
+                             confirm_fn=lambda prompt: d.serial)
+    assert op.result["data_erased_claim"] is False
+    assert op.result["verification_level"] == "command_accepted"
+
+
 def test_target_rejection_skips_without_running(config):
     engine, store = _engine(config)
     d = _drive()

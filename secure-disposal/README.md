@@ -158,6 +158,7 @@ operation that was interrupted as `NEEDS_MANUAL_REVIEW` (never auto-retried).
 - [docs/PLATFORM_PROCEDURES.md](docs/PLATFORM_PROCEDURES.md) — documented, vendor-approved disposal procedures per platform.
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — known limitations and non-goals.
 - [docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md) — autonomy model, destructive-execution gate, reliability properties, residual risks.
+- [docs/VERIFICATION.md](docs/VERIFICATION.md) — verification state machine, evidence required per transition, and the limits of read-back sampling.
 - [docs/UNRESOLVED_HARDWARE_TASKS.md](docs/UNRESOLVED_HARDWARE_TASKS.md) — precise list of hardware-dependent tasks not completed.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — future development.
 - [docs/TESTING.md](docs/TESTING.md) — test strategy.

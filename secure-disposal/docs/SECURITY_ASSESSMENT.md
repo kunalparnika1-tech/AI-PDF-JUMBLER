@@ -44,9 +44,14 @@ The countdown expiring, operator silence, inactivity, or a missing response are
 ### Verification levels (no false success)
 
 A result is graded `none` → `command_accepted` → `operation_complete` →
-`independently_verified`. An **erasure claim requires `independently_verified`**,
-which is not yet implemented, so a real run is recorded as `executed_unverified`
-and never as erased. Missing or inconclusive evidence never yields success.
+`independently_verified` by the evidence layer (`verification.py`; see
+`VERIFICATION.md`). An **erasure claim requires `independently_verified` with no
+conflicting evidence**. A completed NVMe `sanitize-log` or confirmed LUKS
+key destruction can reach it; an exit code alone cannot; read-back sampling
+alone cannot. Conflicting or failed evidence caps the result at
+`command_accepted` and marks the operation `NEEDS_MANUAL_REVIEW`. Missing or
+inconclusive evidence never yields success. The parsers are implemented and
+unit-tested but not yet validated on real hardware.
 
 If any gate fails for a real request, the engine **downgrades to a dry-run** and
 records `execution.real_denied` in the audit log — it never silently proceeds

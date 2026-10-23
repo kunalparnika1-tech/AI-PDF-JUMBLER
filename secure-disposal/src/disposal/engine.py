@@ -152,41 +152,39 @@ class ExecutionEngine:
         command = adapter.build_command(drive)
         result = chosen.run(command, timeout=timeout)
 
-        self.state.checkpoint(op, OpState.VERIFYING, "running verification")
-        verify = adapter.verify(drive, chosen)
+        self.state.checkpoint(op, OpState.VERIFYING, "collecting verification evidence")
 
         executed = result.executed
         succeeded = (not op.destructive) or (not executed) or (
             result.returncode == 0)
 
-        # Verification level: distinguish command-accepted from completion from
-        # independent verification. We DO NOT currently have independent
-        # read-back parsing (see UNRESOLVED_HARDWARE_TASKS), so a real success
-        # tops out at COMMAND_ACCEPTED and must not be reported as fully
-        # verified. Missing/failed evidence never yields a success claim.
-        if not executed:
-            vlevel = VerificationLevel.NONE
-        elif not succeeded:
-            vlevel = VerificationLevel.NONE
-        elif verify.executed and verify.returncode == 0:
-            vlevel = VerificationLevel.COMMAND_ACCEPTED
+        # The command baseline: a zero exit code is only COMMAND_ACCEPTED, and
+        # nothing-ran is NONE. The independent evidence layer then decides how
+        # much further (if at all) the verification state may advance.
+        if not executed or not succeeded:
+            command_level = VerificationLevel.NONE
         else:
-            vlevel = VerificationLevel.COMMAND_ACCEPTED
+            command_level = VerificationLevel.COMMAND_ACCEPTED
 
-        # An erasure CLAIM requires a real successful op AND at least
-        # independent verification. Since that is not yet implemented, a real
-        # run is recorded as executed-but-not-independently-verified.
+        from . import verification as V
+        verify, finding = adapter.collect_evidence(drive, chosen, result)
+        graded = V.grade(command_level, [finding])
+        vlevel = graded.level
         independently_verified = (vlevel == VerificationLevel.INDEPENDENTLY_VERIFIED)
+        has_conflict = bool(graded.conflicts)
+
         op.result = {
             "command": result.command,
             "executed": executed,
             "returncode": result.returncode,
             "verify_executed": verify.executed,
             "verification_level": vlevel.value,
+            "verification": graded.to_dict(),
             "note": result.note,
-            # Only claim erasure on real success AND independent verification.
+            # Only claim erasure on a real, successful op that is INDEPENDENTLY
+            # VERIFIED with no conflicting evidence.
             "data_erased_claim": bool(executed and succeeded and op.destructive
-                                      and independently_verified),
+                                      and independently_verified and not has_conflict),
             "executed_unverified": bool(executed and succeeded and op.destructive
                                         and not independently_verified),
             "verification_evidence": (verify.stdout if verify.executed
@@ -195,11 +193,18 @@ class ExecutionEngine:
         if not executed:
             self.state.checkpoint(op, OpState.SUCCEEDED,
                                   "dry-run/simulation complete (no data destroyed)")
-        elif succeeded:
-            self.state.checkpoint(op, OpState.SUCCEEDED, "command returned success")
-        else:
+        elif not succeeded:
             self.state.checkpoint(op, OpState.FAILED,
                                   f"command returned {result.returncode}")
+        elif has_conflict:
+            # Executed, but verification evidence conflicts/fails. Never report
+            # success: this needs a human to reconcile.
+            self.state.checkpoint(op, OpState.NEEDS_MANUAL_REVIEW,
+                                  "verification evidence conflicts; "
+                                  f"level={vlevel.value}")
+        else:
+            self.state.checkpoint(op, OpState.SUCCEEDED,
+                                  f"command succeeded; verification={vlevel.value}")
 
         self.audit.append("execution.op_complete", auth.confirming_admin, {
             "target": drive.name, "method": adapter.method,

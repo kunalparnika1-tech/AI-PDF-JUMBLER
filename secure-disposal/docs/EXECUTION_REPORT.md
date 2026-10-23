@@ -4,6 +4,29 @@ This records the autonomous development run that extended the simulation-only
 prototype into an execution-capable system. It covers completed work, test
 results, limitations, and required operator actions.
 
+## Iteration 3 — independent verification layer
+
+Added `verification.py`: parsers for documented evidence (NVMe `sanitize-log`
+SSTAT, `cryptsetup luksDump`, structured read-back samples, bare exit code) plus
+a conservative `grade()` that combines a command baseline with evidence.
+
+- **State machine enforced**: `none → command_accepted → operation_complete →
+  independently_verified`, with the required evidence for each transition
+  documented in `VERIFICATION.md`.
+- **No false success**: a zero exit code is only `command_accepted`; LBA
+  sampling tops out at `operation_complete` (FTL/over-provisioning caveat);
+  only a controller-level completion (NVMe SSTAT completed) or confirmed key
+  destruction reaches `independently_verified`.
+- **Conflict handling**: failed/incomplete/contradictory evidence caps the
+  result at `command_accepted`, records the conflict and follow-up, and the
+  engine marks the op `NEEDS_MANUAL_REVIEW` — never success.
+- **Engine integration**: `data_erased_claim` is true only on a real,
+  successful, `independently_verified`, conflict-free op; adapters expose
+  read-only evidence commands (NVMe sanitize-log, luksDump).
+
+Tests this iteration: +19 (verification unit tests + engine integration for
+completed / failed / in-progress evidence), **76 total**, all passing per-file.
+
 ## Iteration 2 — hardware identification & verification
 
 Added on top of the execution engine (human-in-the-loop preserved; no

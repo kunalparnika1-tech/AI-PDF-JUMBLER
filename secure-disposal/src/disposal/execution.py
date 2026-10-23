@@ -196,6 +196,8 @@ class ExecutionAdapter(ABC):
     capability: str = ""
     destructive: bool = True
     requires_encryption: bool = False
+    # Which documented evidence this adapter can collect for verification.
+    evidence_kind: str = "exit-code"
 
     @abstractmethod
     def supports(self, drive: Drive) -> bool: ...
@@ -260,6 +262,22 @@ class ExecutionAdapter(ABC):
     def verify_command(self, drive: Drive) -> list[str]:
         return ["lsblk", "-no", "NAME,SIZE,FSTYPE", drive.name]
 
+    def collect_evidence(self, drive: Drive, runner: CommandRunner,
+                         command_result: CommandResult):
+        """Run the READ-ONLY evidence command and parse it into a
+        VerificationFinding. Imported lazily to avoid a circular import."""
+        from . import verification as V
+        ev = runner.run(self.verify_command(drive), timeout=120)
+        if not ev.executed:
+            # Dry-run/simulation: no device evidence exists.
+            return ev, V.parse_exit_only(None)
+        text = ev.stdout or ""
+        if self.evidence_kind == "nvme-sanitize-log":
+            return ev, V.parse_nvme_sanitize_log(text)
+        if self.evidence_kind == "cryptsetup-luks":
+            return ev, V.parse_cryptsetup_luksdump(text, erase_rc=command_result.returncode)
+        return ev, V.parse_exit_only(command_result.returncode)
+
 
 class SimulationAdapter(ExecutionAdapter):
     method = "simulation"
@@ -291,6 +309,7 @@ class BlkdiscardAdapter(ExecutionAdapter):
 class NvmeFormatAdapter(ExecutionAdapter):
     method = "vendor-secure-erase"
     capability = "nvme-format"
+    evidence_kind = "nvme-sanitize-log"
 
     def supports(self, drive: Drive) -> bool:
         return drive.technology == "SSD-NVMe"
@@ -298,6 +317,9 @@ class NvmeFormatAdapter(ExecutionAdapter):
     def build_command(self, drive: Drive) -> list[str]:
         # -s1 = user-data erase; -s2 = cryptographic erase (if supported).
         return ["nvme", "format", drive.name, "--ses=1"]
+
+    def verify_command(self, drive: Drive) -> list[str]:
+        return ["nvme", "sanitize-log", drive.name]
 
 
 class AtaSecureEraseAdapter(ExecutionAdapter):
@@ -317,12 +339,16 @@ class LuksEraseAdapter(ExecutionAdapter):
     method = "cryptographic-erase"
     capability = "luks-erase"
     requires_encryption = True
+    evidence_kind = "cryptsetup-luks"
 
     def supports(self, drive: Drive) -> bool:
         return any(p.encrypted for p in drive.partitions)
 
     def build_command(self, drive: Drive) -> list[str]:
         return ["cryptsetup", "luksErase", "--batch-mode", drive.name]
+
+    def verify_command(self, drive: Drive) -> list[str]:
+        return ["cryptsetup", "luksDump", drive.name]
 
 
 ADAPTERS: dict[str, type[ExecutionAdapter]] = {

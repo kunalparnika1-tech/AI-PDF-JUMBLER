@@ -23,11 +23,19 @@ an operator can schedule them deliberately. None of these are claimed as done.
    via `hdparm --security-set-pass` and a `not frozen` state; NVMe sanitize
    support must be read from the controller before a format. These device-state
    checks need real drives.
-3. **Independent post-operation verification — NOT YET IMPLEMENTED.** The engine
-   currently tops out at `command_accepted` and explicitly records a real run as
-   `executed_unverified`; it never claims `data_erased`. Implementing content
-   sampling of representative LBAs and parsing the drive's sanitize-status /
-   NVMe sanitize log to reach `independently_verified` requires real hardware.
+3. **Independent post-operation verification — IMPLEMENTED IN SOFTWARE, needs
+   hardware validation.** `verification.py` parses NVMe `sanitize-log` (SSTAT),
+   `cryptsetup luksDump`, and structured read-back samples, grades them into the
+   four-state model, and the engine claims `data_erased` only on
+   `independently_verified` with no conflict (else `NEEDS_MANUAL_REVIEW`). Still
+   to do on real hardware:
+   - Validate NVMe SSTAT parsing against drives from multiple vendors.
+   - Validate LUKS keyslot interpretation on LUKS1 and LUKS2.
+   - Confirm the all-zero-sampling limitation handling against real SSDs.
+4. **ATA / Windows / Android completion parsers — NOT YET IMPLEMENTED.** These
+   adapters currently top out at `command_accepted` (exit code only). Parsing
+   `hdparm` security status, Windows vendor/`Get-Disk` completion, and Android
+   EMM wipe attestation each needs the corresponding real environment.
 4. **Windows execution adapter**: `cipher /w`, `manage-bde` crypto-erase,
    vendor toolkits — requires a Windows host and Administrator.
 5. **Android / OPS adapters**: EMM/MDM enterprise-wipe invocation and OPS module
