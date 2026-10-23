@@ -21,7 +21,8 @@ from typing import Callable
 from .audit import AuditLog
 from .config import Config
 from .execution import (CommandRunner, DryRunRunner, DesignatedTarget,
-                        ExecutionAdapter, RealCommandRunner, TargetGuard)
+                        ExecutionAdapter, RealCommandRunner, TargetGuard,
+                        VerificationLevel)
 from .inventory import Drive
 from .logging_ import StructuredLogger
 from .state import OpState, Operation, StateStore
@@ -89,11 +90,15 @@ class ExecutionEngine:
         confirm_fn: ConfirmFn | None = None,
         boot_drive: str | None = None,
         allow_external: bool = False,
+        ambiguous_ids: set[str] | None = None,
+        reverify_fn: "Callable[[], Drive | None] | None" = None,
         timeout: float = 3600.0,
     ) -> Operation:
         # Target guard applies in EVERY mode (sim or real).
         try:
-            TargetGuard.validate(drive, target, boot_drive, allow_external)
+            TargetGuard.validate(drive, target, boot_drive, allow_external,
+                                 ambiguous_ids=ambiguous_ids or set(),
+                                 require_identity=op.destructive)
         except Exception as e:
             self.state.checkpoint(op, OpState.SKIPPED, f"target rejected: {e}")
             self.audit.append("execution.target_rejected", auth.confirming_admin,
@@ -104,6 +109,28 @@ class ExecutionEngine:
         # Decide the runner. Default is always dry-run.
         chosen = runner or DryRunRunner()
         real_ok, why = self._may_execute_for_real(op, auth, target, drive, confirm_fn)
+
+        # Preflight runs before a REAL destructive op. No silent fallback: if it
+        # fails, we do not switch methods — we downgrade to dry-run and record.
+        if isinstance(chosen, RealCommandRunner) and real_ok and op.destructive:
+            pf = adapter.preflight(drive)
+            if not pf.ok:
+                why = "preflight failed: " + "; ".join(pf.blocking)
+                real_ok = False
+            else:
+                # Immediate re-verification of the physical target right before
+                # the irreversible step: re-detect and compare identity. A
+                # replaced/removed device is a hard stop.
+                if reverify_fn is not None:
+                    fresh = reverify_fn()
+                    if fresh is None:
+                        why = "re-verification failed: target no longer present"
+                        real_ok = False
+                    elif fresh.identity() != target.expected_identity():
+                        why = (f"re-verification mismatch: {fresh.identity()} != "
+                               f"{target.expected_identity()} (device replaced?)")
+                        real_ok = False
+
         if isinstance(chosen, RealCommandRunner) and not real_ok:
             # Caller wanted real execution but a gate failed -> downgrade safely.
             self.log.warn("real_execution_denied", target=drive.name, reason=why)
@@ -131,15 +158,37 @@ class ExecutionEngine:
         executed = result.executed
         succeeded = (not op.destructive) or (not executed) or (
             result.returncode == 0)
+
+        # Verification level: distinguish command-accepted from completion from
+        # independent verification. We DO NOT currently have independent
+        # read-back parsing (see UNRESOLVED_HARDWARE_TASKS), so a real success
+        # tops out at COMMAND_ACCEPTED and must not be reported as fully
+        # verified. Missing/failed evidence never yields a success claim.
+        if not executed:
+            vlevel = VerificationLevel.NONE
+        elif not succeeded:
+            vlevel = VerificationLevel.NONE
+        elif verify.executed and verify.returncode == 0:
+            vlevel = VerificationLevel.COMMAND_ACCEPTED
+        else:
+            vlevel = VerificationLevel.COMMAND_ACCEPTED
+
+        # An erasure CLAIM requires a real successful op AND at least
+        # independent verification. Since that is not yet implemented, a real
+        # run is recorded as executed-but-not-independently-verified.
+        independently_verified = (vlevel == VerificationLevel.INDEPENDENTLY_VERIFIED)
         op.result = {
             "command": result.command,
             "executed": executed,
             "returncode": result.returncode,
             "verify_executed": verify.executed,
+            "verification_level": vlevel.value,
             "note": result.note,
-            # We only claim erasure when a real op ran AND returned success AND
-            # verification evidence exists. A dry-run never claims erasure.
-            "data_erased_claim": bool(executed and succeeded and op.destructive),
+            # Only claim erasure on real success AND independent verification.
+            "data_erased_claim": bool(executed and succeeded and op.destructive
+                                      and independently_verified),
+            "executed_unverified": bool(executed and succeeded and op.destructive
+                                        and not independently_verified),
             "verification_evidence": (verify.stdout if verify.executed
                                       else "n/a (dry-run/simulation)"),
         }

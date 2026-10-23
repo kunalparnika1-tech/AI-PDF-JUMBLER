@@ -26,12 +26,15 @@ entirely by the gate above.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Protocol
+from enum import Enum
+from typing import Protocol
 
 from .inventory import Drive
+from . import privileges as priv
 
 
 class ExecutionError(Exception):
@@ -93,22 +96,55 @@ class DesignatedTarget:
     drive_name: str
     expected_serial: str
     expected_size: str
+    expected_wwn: str = ""
+    # When True (the default for destructive ops), the drive MUST carry a strong
+    # hardware identity (serial or WWN) that matches; weak identities are refused.
+    require_strong_identity: bool = True
+
+    def expected_identity(self) -> str:
+        if self.expected_wwn:
+            return f"wwn:{self.expected_wwn}"
+        if self.expected_serial:
+            return f"serial:{self.expected_serial}"
+        return f"weak:||{self.drive_name}"
 
 
 class TargetGuard:
     @staticmethod
     def validate(drive: Drive, target: DesignatedTarget,
-                 boot_drive: str | None, allow_external: bool = False) -> None:
+                 boot_drive: str | None, allow_external: bool = False,
+                 ambiguous_ids: set[str] | None = None,
+                 require_identity: bool | None = None) -> None:
+        ambiguous_ids = ambiguous_ids or set()
+        require_identity = (target.require_strong_identity
+                            if require_identity is None else require_identity)
+
         if drive.name != target.drive_name:
             raise TargetValidationError(
                 f"target path mismatch: {drive.name} != {target.drive_name}")
-        # A real drive object would expose a serial; our model does not carry
-        # one yet, so we validate on name+size and require the caller to have
-        # matched the serial out of band. Size mismatch is a hard stop.
+
+        # Size is a cheap sanity check; identity below is the authoritative one.
         if target.expected_size and drive.size and drive.size != target.expected_size:
             raise TargetValidationError(
                 f"size mismatch for {drive.name}: {drive.size} != "
                 f"{target.expected_size} (wrong device?)")
+
+        # Strong hardware identity: refuse weak/ambiguous, and require a match.
+        if require_identity:
+            if not drive.has_strong_identity():
+                raise TargetValidationError(
+                    f"{drive.name} has no serial/WWN; identity is WEAK and "
+                    "cannot be destructively targeted")
+            key = drive.serial or drive.wwn
+            if key in ambiguous_ids:
+                raise TargetValidationError(
+                    f"{drive.name} shares identifier {key!r} with another drive; "
+                    "ambiguous identity, refusing")
+            if drive.identity() != target.expected_identity():
+                raise TargetValidationError(
+                    f"identity mismatch for {drive.name}: detected "
+                    f"{drive.identity()} != authorized {target.expected_identity()}")
+
         # Refuse a drive mounted as the live controller's own root/boot. (A
         # remote target device's own mountpoints are not the controller's; use
         # --boot-drive to pin the boot drive explicitly for those.)
@@ -138,10 +174,28 @@ class AdapterPlan:
     rationale: str
 
 
+@dataclass
+class PreflightResult:
+    """Independent pre-execution checks. ``ok`` must be True before a real run.
+    ``blocking`` lists hard stops; ``warnings`` are advisory."""
+    ok: bool
+    checks: dict[str, bool] = field(default_factory=dict)
+    blocking: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+class VerificationLevel(str, Enum):
+    NONE = "none"                       # nothing ran (dry-run/simulation)
+    COMMAND_ACCEPTED = "command_accepted"   # tool returned success
+    OPERATION_COMPLETE = "operation_complete"  # device reports done
+    INDEPENDENTLY_VERIFIED = "independently_verified"  # sample read-back confirms
+
+
 class ExecutionAdapter(ABC):
     method: str = ""
     capability: str = ""
     destructive: bool = True
+    requires_encryption: bool = False
 
     @abstractmethod
     def supports(self, drive: Drive) -> bool: ...
@@ -157,6 +211,47 @@ class ExecutionAdapter(ABC):
 
     def rationale(self, drive: Drive) -> str:
         return f"{self.method} on {drive.name}"
+
+    def preflight(self, drive: Drive,
+                  report: "priv.PrivilegeReport | None" = None) -> PreflightResult:
+        """Independent checks run before any destructive command. We never
+        silently fall back to another method: if this adapter's method is not
+        supported, preflight FAILS and the caller must stop or pick explicitly."""
+        report = report or priv.detect()
+        checks: dict[str, bool] = {}
+        blocking: list[str] = []
+        warnings: list[str] = []
+
+        checks["hardware_compatible"] = self.supports(drive)
+        if not checks["hardware_compatible"]:
+            blocking.append(
+                f"method {self.method!r} not supported for {drive.technology} "
+                f"drive {drive.name}")
+
+        if self.destructive:
+            checks["strong_identity"] = drive.has_strong_identity()
+            if not checks["strong_identity"]:
+                blocking.append(f"{drive.name} lacks a serial/WWN (weak identity)")
+
+            checks["privileged"] = report.is_elevated
+            if not report.is_elevated:
+                blocking.append("elevated privileges required")
+
+            checks["tool_available"] = not priv.missing_requirements(
+                self.capability, report)
+            for reason in priv.missing_requirements(self.capability, report):
+                blocking.append(reason)
+
+        if self.requires_encryption:
+            enc = any(p.encrypted for p in drive.partitions)
+            checks["encryption_prerequisite"] = enc
+            if not enc:
+                blocking.append(
+                    f"{self.method} requires an encrypted volume; none detected "
+                    f"on {drive.name}")
+
+        return PreflightResult(ok=not blocking, checks=checks,
+                               blocking=blocking, warnings=warnings)
 
     def verify(self, drive: Drive, runner: CommandRunner) -> CommandResult:
         """Post-op verification is a READ-ONLY check. Default: read device info."""
@@ -221,6 +316,7 @@ class AtaSecureEraseAdapter(ExecutionAdapter):
 class LuksEraseAdapter(ExecutionAdapter):
     method = "cryptographic-erase"
     capability = "luks-erase"
+    requires_encryption = True
 
     def supports(self, drive: Drive) -> bool:
         return any(p.encrypted for p in drive.partitions)

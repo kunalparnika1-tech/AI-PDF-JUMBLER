@@ -56,6 +56,33 @@ executed against a real device by the test suite. Preflight requirements (e.g.
 ATA Secure Erase needs a password set and a non-frozen drive) are listed in
 `UNRESOLVED_HARDWARE_TASKS.md`.
 
+## Platform inventory adapters (read-only) — required access
+
+All inventory adapters are **read-only** and split into a subprocess caller and
+a pure parser (the parsers are unit-tested without the host OS present).
+
+| Platform | Adapter | Tool / API | Privileges | Identifiers read | Vendor support needed |
+|---|---|---|---|---|---|
+| Linux | `_linux_lsblk` | `lsblk -J` | none to list; elevated for full serials | NAME, MODEL, SIZE, TRAN, SERIAL, WWN, VENDOR | none |
+| Windows | `_windows_powershell` / `_parse_windows_disks` | PowerShell `Get-Disk` | elevated for SerialNumber | Number, FriendlyName, SerialNumber, Size, BusType | none |
+| Android | `_android_adb` / `_parse_android_disks` | `adb shell lsblk -J` | USB-debugging authorized; EMM/MDM for any wipe | name, size, serial | vendor EMM for sanitization |
+| Smart board | `sample_board` (simulated) | per-vendor | per-vendor | independent Android eMMC + OPS NVMe, each with its own identity | **yes** — procedures and guarantees are vendor-specific |
+
+Smart boards are inventoried as **independent environments**: the embedded
+Android storage and any attached Windows OPS module are separate drives with
+separate identities and separate sanitization paths. No specific physical board
+is claimed compatible without hardware testing and vendor documentation.
+
+## Target-identity verification (destructive ops)
+
+Before a destructive operation, the target drive must have a **strong identity**
+(serial or WWN) that matches what was authorized. The engine:
+- refuses a weak identity (no serial/WWN),
+- refuses an ambiguous identity (serial/WWN shared by more than one drive),
+- re-detects and re-compares the device **immediately before** the irreversible
+  step, and treats a removed or replaced device (same path, new identity) as a
+  hard stop.
+
 ## Hard rules
 
 - Never assume a device has exactly one drive.

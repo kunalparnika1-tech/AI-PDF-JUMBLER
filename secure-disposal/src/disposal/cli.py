@@ -275,13 +275,25 @@ def cmd_execute(args):
             run.operations.append(op); store.save()
         target = DesignatedTarget(
             drive_name=drive.name,
-            expected_serial=args.target_serial or drive.name,
-            expected_size=args.target_size or drive.size)
+            expected_serial=args.target_serial or drive.serial,
+            expected_wwn=args.target_wwn or drive.wwn,
+            expected_size=args.target_size or drive.size,
+            require_strong_identity=adapter.destructive)
+
+        def _reverify(name=drive.name):
+            # Re-detect immediately before the irreversible step and return the
+            # fresh view of this physical path (None if gone). Only meaningful
+            # for a real run on actually-detected hardware.
+            fresh = _load_inventory(args)
+            return next((x for x in fresh.drives if x.name == name), None)
+
         engine.execute_operation(
             op, drive, adapter, auth, target,
             runner=runner, confirm_fn=_stdin_confirm,
             boot_drive=args.boot_drive,
-            allow_external=bool(drive.name in allow_external))
+            allow_external=bool(drive.name in allow_external),
+            ambiguous_ids=inv_mod.duplicate_identifiers(inv),
+            reverify_fn=(_reverify if args.real else None))
         claim = op.result and op.result.get("data_erased_claim")
         print(f"{drive.name}: state={op.state} "
               f"executed={op.result and op.result.get('executed')} "
@@ -379,6 +391,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="request REAL execution (still gated by config + env "
                         "DISPOSAL_ALLOW_REAL_EXECUTION=yes + typed serial)")
     s.add_argument("--target-serial", help="expected serial of the target drive")
+    s.add_argument("--target-wwn", help="expected WWN of the target drive")
     s.add_argument("--target-size", help="expected size of the target drive")
     s.add_argument("--boot-drive", help="path of the OS boot drive (refused)")
     s.add_argument("--allow-external", nargs="*",

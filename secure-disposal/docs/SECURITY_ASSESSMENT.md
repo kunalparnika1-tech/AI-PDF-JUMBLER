@@ -30,8 +30,23 @@ The countdown expiring, operator silence, inactivity, or a missing response are
 6. **Target identity.** `TargetGuard` pins the physical drive by name + size,
    refuses the live root/boot drive, refuses external/USB/network drives unless
    explicitly named, and refuses partitions as targets.
-7. **Human serial confirmation.** At the moment of action a human must type the
+7. **Strong, matched identity.** The target must carry a serial/WWN that matches
+   the authorized identity; weak (no serial) or ambiguous (duplicate) identities
+   are refused.
+8. **Adapter preflight.** Identity, hardware compatibility, method support,
+   privileges, encryption prerequisite, and tool availability are checked; any
+   failure stops the op with **no silent fallback** to another method.
+9. **Immediate re-verification.** The device is re-detected and re-compared right
+   before the irreversible step; a removed/replaced device aborts.
+10. **Human serial confirmation.** At the moment of action a human must type the
    target's exact serial; anything else aborts.
+
+### Verification levels (no false success)
+
+A result is graded `none` → `command_accepted` → `operation_complete` →
+`independently_verified`. An **erasure claim requires `independently_verified`**,
+which is not yet implemented, so a real run is recorded as `executed_unverified`
+and never as erased. Missing or inconclusive evidence never yields success.
 
 If any gate fails for a real request, the engine **downgrades to a dry-run** and
 records `execution.real_denied` in the audit log — it never silently proceeds
@@ -62,7 +77,7 @@ and never escalates privileges on its own.
 
 | Risk | Recommendation |
 |---|---|
-| Serial is matched on operator-provided value, not yet read from the device | Add a device-serial reader per platform and compare automatically before accepting the typed serial. |
+| Serial/WWN reading implemented (Linux/Windows/Android) but not validated on real hardware | Validate against real devices; handle empty serials on USB bridges and virtual disks. |
 | Audit log is tamper-evident, not tamper-proof | Anchor the chain head to external WORM storage. |
 | A real adapter's command assumes a correctly prepared device (e.g. ATA Secure Erase needs a password set first) | Add per-adapter preflight checks; treat preflight failure as a hard stop. |
 | Verification is currently a read-back of device metadata | Add content sampling and vendor sanitize-status parsing before asserting success. |

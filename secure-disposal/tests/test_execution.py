@@ -11,8 +11,9 @@ from disposal.logging_ import StructuredLogger
 from disposal.state import OpState, Operation, StateStore
 
 
-def _drive(name="/dev/sda", tech="SSD-NVMe", size="256G", **kw):
-    return Drive(name=name, technology=tech, size=size, **kw)
+def _drive(name="/dev/sda", tech="SSD-NVMe", size="256G", serial="SER-SDA",
+           **kw):
+    return Drive(name=name, technology=tech, size=size, serial=serial, **kw)
 
 
 def _engine(config):
@@ -33,7 +34,7 @@ def _auth():
 
 
 def _target(drive):
-    return DesignatedTarget(drive.name, "SERIAL123", drive.size)
+    return DesignatedTarget(drive.name, drive.serial or "SER-SDA", drive.size)
 
 
 # -- target guard --------------------------------------------------------
@@ -129,9 +130,15 @@ def test_real_denied_on_two_person_violation(config, monkeypatch):
 
 def test_real_executes_with_all_gates_via_fake_runner(config, monkeypatch):
     """All gates pass -> the chosen runner IS used. We inject a fake runner so
-    no real command touches the system."""
+    no real command touches the system, and stub the privilege/tool checks so
+    the test does not depend on blkdiscard being installed."""
+    import disposal.execution as ex
     config.allow_real_execution = True
     monkeypatch.setenv("DISPOSAL_ALLOW_REAL_EXECUTION", "yes")
+    monkeypatch.setattr(ex.priv, "detect", lambda: ex.priv.PrivilegeReport(
+        platform="Linux", is_elevated=True, uid=0, euid=0, user="root", notes=[]))
+    monkeypatch.setattr(ex.priv, "missing_requirements",
+                        lambda cap, report=None: [])
     engine, store = _engine(config)
     d = _drive()
     adapter = BlkdiscardAdapter()
@@ -149,10 +156,51 @@ def test_real_executes_with_all_gates_via_fake_runner(config, monkeypatch):
 
     engine.execute_operation(op, d, adapter, _auth(), _target(d),
                              runner=FakeReal(),
-                             confirm_fn=lambda prompt: "SERIAL123")
+                             confirm_fn=lambda prompt: d.serial)
     assert calls and calls[0] == ["blkdiscard", "--secure", "/dev/sda"]
     assert op.state == OpState.SUCCEEDED.value
-    assert op.result["data_erased_claim"] is True
+    # Executed, but no independent read-back verification exists yet, so we must
+    # NOT claim erasure — only that a command ran unverified.
+    assert op.result["data_erased_claim"] is False
+    assert op.result["executed_unverified"] is True
+
+
+def test_guard_rejects_weak_identity_for_destructive():
+    from disposal.execution import DesignatedTarget
+    d = _drive(serial="")           # no serial/WWN -> weak
+    t = DesignatedTarget(d.name, "", d.size)
+    with pytest.raises(TargetValidationError):
+        TargetGuard.validate(d, t, boot_drive=None, require_identity=True)
+
+
+def test_guard_rejects_ambiguous_identity():
+    d = _drive(serial="DUP123")
+    t = _target(d)
+    with pytest.raises(TargetValidationError):
+        TargetGuard.validate(d, t, boot_drive=None, require_identity=True,
+                             ambiguous_ids={"DUP123"})
+
+
+def test_reverify_mismatch_blocks_real(config, monkeypatch):
+    import disposal.execution as ex
+    config.allow_real_execution = True
+    monkeypatch.setenv("DISPOSAL_ALLOW_REAL_EXECUTION", "yes")
+    monkeypatch.setattr(ex.priv, "detect", lambda: ex.priv.PrivilegeReport(
+        platform="Linux", is_elevated=True, uid=0, euid=0, user="root", notes=[]))
+    monkeypatch.setattr(ex.priv, "missing_requirements",
+                        lambda cap, report=None: [])
+    engine, store = _engine(config)
+    d = _drive(serial="SER-SDA")
+    adapter = BlkdiscardAdapter()
+    op = _op(adapter, d)
+    store.run.operations.append(op)
+    # Re-verification returns a DIFFERENT drive at the same path (replaced).
+    swapped = _drive(serial="SER-OTHER")
+    engine.execute_operation(op, d, adapter, _auth(), _target(d),
+                             runner=ex.RealCommandRunner(),
+                             confirm_fn=lambda prompt: d.serial,
+                             reverify_fn=lambda: swapped)
+    assert op.result["executed"] is False  # replacement detected -> downgraded
 
 
 def test_target_rejection_skips_without_running(config):

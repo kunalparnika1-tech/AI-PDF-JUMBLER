@@ -5,17 +5,29 @@ privileges on a designated host, vendor tooling, or manufacturer documentation.
 They are explicitly **out of scope for autonomous completion** and are listed so
 an operator can schedule them deliberately. None of these are claimed as done.
 
-## Requires real devices / privileges
-1. **Automatic device-serial read** per platform (Linux `lsblk -o SERIAL` /
-   `nvme id-ctrl`, Windows WMI `Win32_DiskDrive.SerialNumber`, Android build
-   props). Needed so the typed-serial confirmation can be checked against the
-   device, not just operator input.
-2. **Adapter preflight checks**: e.g. ATA Secure Erase requires a user password
-   set via `hdparm --security-set-pass` and a `not frozen` state; NVMe sanitize
-   support must be read from the controller before `nvme format`.
-3. **Real post-operation verification**: content sampling of representative
-   LBAs and parsing of the drive's sanitize-status / NVMe sanitize log to
-   produce machine-readable evidence.
+## Status update (this iteration)
+- **Serial/WWN reading — IMPLEMENTED (needs hardware validation).** Linux
+  (`lsblk` SERIAL/WWN) and Windows (`Get-Disk` SerialNumber) parsers are in
+  place and unit-tested on sample output; Android via `adb shell lsblk`. These
+  have not been validated against real devices in this environment.
+- **Adapter preflight — IMPLEMENTED.** Identity, compatibility, method support,
+  privileges, encryption prerequisite, and tool availability are checked before
+  any real op, with no silent fallback. Validated in unit tests.
+- **Target re-verification — IMPLEMENTED.** Re-detect-and-compare immediately
+  before the irreversible step; replacement/removal is a hard stop.
+
+## Still requires real devices / privileges
+1. **Validate serial/WWN reading on real Linux/Windows/Android hardware** and
+   handle vendor quirks (empty serials on some USB bridges, virtual disks).
+2. **Adapter preflight depth**: ATA Secure Erase also needs a user password set
+   via `hdparm --security-set-pass` and a `not frozen` state; NVMe sanitize
+   support must be read from the controller before a format. These device-state
+   checks need real drives.
+3. **Independent post-operation verification — NOT YET IMPLEMENTED.** The engine
+   currently tops out at `command_accepted` and explicitly records a real run as
+   `executed_unverified`; it never claims `data_erased`. Implementing content
+   sampling of representative LBAs and parsing the drive's sanitize-status /
+   NVMe sanitize log to reach `independently_verified` requires real hardware.
 4. **Windows execution adapter**: `cipher /w`, `manage-bde` crypto-erase,
    vendor toolkits — requires a Windows host and Administrator.
 5. **Android / OPS adapters**: EMM/MDM enterprise-wipe invocation and OPS module

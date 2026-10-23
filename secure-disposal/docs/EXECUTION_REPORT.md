@@ -4,6 +4,32 @@ This records the autonomous development run that extended the simulation-only
 prototype into an execution-capable system. It covers completed work, test
 results, limitations, and required operator actions.
 
+## Iteration 2 — hardware identification & verification
+
+Added on top of the execution engine (human-in-the-loop preserved; no
+website/USB auto-trigger, no auto-execution on countdown):
+
+- **USB / drive identification**: `Drive` now carries serial/WWN/vendor; a
+  stable `identity()` prefers WWN → serial → (weak) path. Linux `lsblk` reads
+  SERIAL/WWN/VENDOR. Missing serials are flagged WEAK; duplicate serials are
+  flagged ambiguous. `diff_inventories` detects removal and replacement.
+- **Target verification**: `TargetGuard` now requires a strong, matching
+  identity for destructive ops, refuses weak/ambiguous identities, and the
+  engine re-detects and re-compares the device immediately before the
+  irreversible step (replacement/removal = hard stop).
+- **Platform inventory adapters**: Windows (`Get-Disk`) and Android
+  (`adb shell lsblk`) read-only adapters with pure, unit-tested parsers; Linux
+  extended. Requirements documented in `COMPATIBILITY.md`.
+- **Adapter preflight**: identity, compatibility, method support, privileges,
+  encryption prerequisite, tool availability — no silent fallback.
+- **Verification levels**: `none → command_accepted → operation_complete →
+  independently_verified`. A real run is recorded as `executed_unverified`;
+  `data_erased` is never claimed without independent verification (not yet
+  implemented — see UNRESOLVED_HARDWARE_TASKS.md).
+
+Tests this iteration: +13 (execution guards/preflight/re-verify, inventory
+identity, platform parsers), **57 total**, all passing per-file.
+
 ## Completed work
 
 | Component (directive §) | Module(s) | State |
