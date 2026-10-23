@@ -109,6 +109,47 @@ State (users, audit log, schedule, reports) lives under
 password store and data directory are created with restrictive permissions on
 POSIX systems.
 
+## Autonomous execution and the real-execution gate
+
+The engine runs everything non-destructive **without supervision**: inventory,
+compatibility, scheduling, dry-run execution, reporting, audit, structured
+logging, persistent state, and crash recovery. You can start an authorized
+dry-run and come back to a complete report.
+
+**Real destructive execution is never autonomous.** The `execute` command is a
+dry-run by default (it issues no command to any device). A real sanitize command
+runs only when *all* of these hold at once:
+
+1. `allow_real_execution: true` in your `--config` file,
+2. environment `DISPOSAL_ALLOW_REAL_EXECUTION=yes`,
+3. the `--real` flag,
+4. a valid two-person authorization (confirming admin ≠ scheduling admin),
+5. the `TargetGuard` accepts the drive (right size, not the boot drive, not an
+   unlisted external/network drive, not a partition), and
+6. a human types the target drive's **exact serial** when prompted.
+
+If any gate fails, the engine safely **downgrades to a dry-run** and records
+`execution.real_denied` in the audit log. A completed countdown, silence, or
+inactivity is **never** treated as authorization. See
+[docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md).
+
+```bash
+# Dry-run execution over the locked review's targets (destroys nothing):
+disposal execute --as bob --simulated-board --verified --adapter simulation \
+    --allow-external android:emmc0 ops:/dev/nvme0n1
+
+# Inspect privilege level:
+disposal privileges
+
+# Real execution (only on an authorized host, with a real config + env opt-in):
+disposal --config my.json execute --as bob --adapter nvme-format --real \
+    --verified --target-serial S1234 --boot-drive /dev/sda   # prompts for serial
+```
+
+Crash recovery is automatic: if the process dies mid-run, re-running `execute`
+reloads the persisted state, resumes safe operations, and marks any destructive
+operation that was interrupted as `NEEDS_MANUAL_REVIEW` (never auto-retried).
+
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system architecture, stack comparison, scheduler behaviour across device power states.
@@ -116,6 +157,8 @@ POSIX systems.
 - [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) — device/method compatibility matrix and what is cross-platform vs platform-specific.
 - [docs/PLATFORM_PROCEDURES.md](docs/PLATFORM_PROCEDURES.md) — documented, vendor-approved disposal procedures per platform.
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — known limitations and non-goals.
+- [docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md) — autonomy model, destructive-execution gate, reliability properties, residual risks.
+- [docs/UNRESOLVED_HARDWARE_TASKS.md](docs/UNRESOLVED_HARDWARE_TASKS.md) — precise list of hardware-dependent tasks not completed.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — future development.
 - [docs/TESTING.md](docs/TESTING.md) — test strategy.
 

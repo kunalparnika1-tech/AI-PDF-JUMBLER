@@ -71,12 +71,20 @@ def _render_markdown(report: dict[str, Any]) -> str:
     for d in inv["drives"]:
         lines.append(f"- `{d['name']}` — {d['technology']} "
                      f"({'external/network' if d['is_network'] or d['removable'] else 'internal'})")
-    lines += ["", "## Planned actions (simulated)"]
+    lines += ["", "## Actions"]
     for s in disp["steps"]:
-        lines.append(f"- `{s['drive']}`: {s['planned_action']}")
-    lines += ["", "## Verification plan"]
-    for v in disp["verification"]:
-        lines.append(f"- `{v['drive']}`: {v['verification_plan']}")
+        if "planned_action" in s:                      # simulation-workflow shape
+            lines.append(f"- `{s['drive']}`: {s['planned_action']}")
+        else:                                          # execution-engine shape
+            res = s.get("result") or {}
+            claim = res.get("data_erased_claim")
+            lines.append(
+                f"- `{s.get('drive')}`: state=**{s.get('state')}**, "
+                f"executed={res.get('executed')}, erased_claim={bool(claim)}")
+    if disp.get("verification"):
+        lines += ["", "## Verification plan"]
+        for v in disp["verification"]:
+            lines.append(f"- `{v['drive']}`: {v['verification_plan']}")
     chain = report["audit_chain"]
     lines += ["", "## Audit",
               f"- Chain integrity: **{chain['intact']}** — {chain['message']}",

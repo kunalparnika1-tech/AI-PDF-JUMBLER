@@ -1,0 +1,12 @@
+{
+  "_comment": "Example configuration. Copy to a file and pass with --config. All keys are optional; defaults are safe (simulation only).",
+
+  "data_dir": "~/.local/share/secure-disposal",
+
+  "default_countdown_seconds": 3000,
+  "max_failed_attempts": 5,
+  "lockout_seconds": 900,
+
+  "_allow_real_execution_comment": "DANGER. Leave false unless this host is authorized to run REAL destructive sanitize commands. Even when true, real execution ALSO requires: env DISPOSAL_ALLOW_REAL_EXECUTION=yes, the --real flag, a verified two-person authorization, and a human typing the target drive's exact serial at the moment of execution. It is never triggered by the countdown or autonomously.",
+  "allow_real_execution": false
+}

@@ -40,6 +40,12 @@ class Config:
     scrypt_r: int = 8
     scrypt_p: int = 1
 
+    # DANGER FLAG. Must be explicitly set true (here or via config file) before
+    # the engine will EVER run a real destructive command — and even then only
+    # together with the env var, an explicit real runner, and a human serial
+    # confirmation (see execution.py / engine.py). Default: simulation only.
+    allow_real_execution: bool = False
+
     @property
     def users_file(self) -> Path:
         return self.data_dir / "users.json"
@@ -55,6 +61,28 @@ class Config:
     @property
     def reports_dir(self) -> Path:
         return self.data_dir / "reports"
+
+    @property
+    def exec_state_file(self) -> Path:
+        return self.data_dir / "execution.json"
+
+    @property
+    def op_log_file(self) -> Path:
+        return self.data_dir / "operations.log.jsonl"
+
+    @classmethod
+    def from_file(cls, path: Path | str) -> "Config":
+        """Load overrides from a JSON config file. Unknown keys are ignored."""
+        import json
+        cfg = cls()
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        if "data_dir" in data:
+            cfg.data_dir = Path(data["data_dir"]).expanduser()
+        for key in ("default_countdown_seconds", "max_failed_attempts",
+                    "lockout_seconds", "allow_real_execution"):
+            if key in data:
+                setattr(cfg, key, data[key])
+        return cfg
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)

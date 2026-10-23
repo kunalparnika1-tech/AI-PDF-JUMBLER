@@ -37,6 +37,25 @@ erase/verify is not, and must not pretend to be.
 (e.g. embedded Android **and** a pluggable Windows OPS). The tool inventories
 each separately — see `inventory.sample_board()`.
 
+## Execution adapters (method → command → capability)
+
+The execution engine builds these real, documented commands. Whether they
+actually run is governed by the gate in `SECURITY_ASSESSMENT.md`; by default
+they are dry-run only.
+
+| Adapter (`--adapter`) | NIST method | Command built | Required capability | Applies to |
+|---|---|---|---|---|
+| `simulation` | — | *(none)* | read-block-devices | any (default) |
+| `blkdiscard` | Purge (secure discard) | `blkdiscard --secure <dev>` | elevated + `blkdiscard` | SSD (NVMe/SATA) |
+| `nvme-format` | Purge | `nvme format <dev> --ses=1` | elevated + `nvme` | NVMe SSD |
+| `ata-secure-erase` | Purge | `hdparm --security-erase NULL <dev>` | elevated + `hdparm` | SATA SSD / HDD |
+| `luks-erase` | Cryptographic erase | `cryptsetup luksErase --batch-mode <dev>` | elevated + `cryptsetup` | LUKS-encrypted |
+
+Each adapter's real command is unit-tested for construction only; none is ever
+executed against a real device by the test suite. Preflight requirements (e.g.
+ATA Secure Erase needs a password set and a non-frozen drive) are listed in
+`UNRESOLVED_HARDWARE_TASKS.md`.
+
 ## Hard rules
 
 - Never assume a device has exactly one drive.

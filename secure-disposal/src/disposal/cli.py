@@ -29,8 +29,13 @@ from .audit import AuditLog
 from .auth import AuthError, UserStore
 from .config import Config
 from . import compatibility, inventory as inv_mod
+from .engine import Authorization, ExecutionEngine
+from .execution import (DesignatedTarget, DryRunRunner, RealCommandRunner,
+                        get_adapter)
+from .logging_ import StructuredLogger, new_run_id
 from .reporting import build_report, write_report
 from .scheduler import Scheduler, ScheduleError, State
+from .state import Operation, StateStore
 from .workflow import PreAuthChecklist, WorkflowError, run_simulation
 
 
@@ -40,9 +45,12 @@ def _pw(var: str, prompt: str) -> str:
 
 
 def _ctx(args: argparse.Namespace) -> tuple[Config, AuditLog, UserStore, Scheduler]:
-    config = Config()
+    from pathlib import Path
+    if getattr(args, "config", None):
+        config = Config.from_file(args.config)
+    else:
+        config = Config()
     if getattr(args, "data_dir", None):
-        from pathlib import Path
         config.data_dir = Path(args.data_dir)
     config.ensure_dirs()
     audit = AuditLog(config.audit_file)
@@ -198,6 +206,110 @@ def cmd_authorize(args):
     print(f"Simulated workflow complete. Report written:\n  {jp}\n  {mp}")
 
 
+def _stdin_confirm(prompt: str) -> str:
+    try:
+        return input(prompt)
+    except EOFError:
+        return ""
+
+
+def cmd_execute(args):
+    """Run the execution engine over the locked review's target drives.
+
+    Default is a dry-run (no data destroyed). ``--real`` requests real
+    execution, which the engine still gates behind config + env + interactive
+    serial confirmation; if any gate fails the engine safely downgrades to a
+    dry-run and records why.
+    """
+    config, audit, users, sched = _ctx(args)
+    pw = _pw("DISPOSAL_PASSWORD", f"Confirming admin '{args.as_user}' password: ")
+    _require(users, args.as_user, pw, args.mfa_code, ("ADMIN",))
+
+    r = sched.tick()
+    if not r:
+        print("No active review to execute.", file=sys.stderr); sys.exit(2)
+    if r.state != State.LOCKED_PENDING_CONFIRMATION.value:
+        print(f"Review is '{r.state}', not locked-pending-confirmation.",
+              file=sys.stderr); sys.exit(2)
+
+    inv = _load_inventory(args)
+    if args.verified and not inv.verified:
+        inv.verified = True
+        audit.append("inventory.human_verified", args.as_user,
+                     {"review_id": r.review_id})
+    if not inv.verified:
+        print("BLOCKED: inventory not verified (pass --verified).",
+              file=sys.stderr); sys.exit(3)
+
+    logger = StructuredLogger(config.op_log_file, new_run_id(), echo=args.verbose)
+    store = StateStore(config.exec_state_file)
+    run = store.load()
+    if run and run.review_id == r.review_id:
+        actions = store.recover()          # crash recovery before doing anything
+        for a in actions:
+            print(f"RECOVERED: {a}")
+    else:
+        run = store.create(logger.run_id, r.review_id)
+
+    engine = ExecutionEngine(config, audit, store, logger)
+    adapter = get_adapter(args.adapter)
+    auth = Authorization(review_id=r.review_id, scheduling_admin=r.created_by,
+                         confirming_admin=args.as_user, valid=True)
+    runner = RealCommandRunner() if args.real else DryRunRunner()
+    allow_external = set(args.allow_external or [])
+
+    targets = [d for d in inv.drives
+               if (not d.is_external) or (d.name in allow_external)]
+    if not targets:
+        print("No eligible target drives.", file=sys.stderr); sys.exit(3)
+
+    for drive in targets:
+        idem = f"{r.review_id}:{drive.name}"
+        op = run.op(idem)
+        if op and op.state in ("succeeded", "skipped", "needs_manual_review"):
+            print(f"SKIP {drive.name}: already {op.state} (idempotent).")
+            continue
+        if not op:
+            op = Operation(idem_key=idem, target=drive.name,
+                           method=adapter.method, destructive=adapter.destructive)
+            run.operations.append(op); store.save()
+        target = DesignatedTarget(
+            drive_name=drive.name,
+            expected_serial=args.target_serial or drive.name,
+            expected_size=args.target_size or drive.size)
+        engine.execute_operation(
+            op, drive, adapter, auth, target,
+            runner=runner, confirm_fn=_stdin_confirm,
+            boot_drive=args.boot_drive,
+            allow_external=bool(drive.name in allow_external))
+        claim = op.result and op.result.get("data_erased_claim")
+        print(f"{drive.name}: state={op.state} "
+              f"executed={op.result and op.result.get('executed')} "
+              f"erased_claim={bool(claim)}")
+
+    # Mark the review complete and write a report.
+    r.state = State.COMPLETED.value
+    sched._save()
+    from .workflow import SimulationResult
+    result = SimulationResult(review_id=r.review_id, device_id=inv.hostname,
+                              method=adapter.method, simulated=not args.real)
+    for op in run.operations:
+        result.steps.append({"drive": op.target, "state": op.state,
+                             "result": op.result})
+    report = build_report(config, audit, inv, result)
+    report["execution_run"] = store.run.run_id
+    jp, mp = write_report(config, report)
+    print(f"Execution complete. Report:\n  {jp}\n  {mp}")
+
+
+def cmd_privileges(args):
+    from .privileges import detect
+    rep = detect()
+    print(json.dumps({"platform": rep.platform, "elevated": rep.is_elevated,
+                      "user": rep.user, "uid": rep.uid, "euid": rep.euid,
+                      "notes": rep.notes}, indent=2))
+
+
 def cmd_audit_verify(args):
     _, audit, _, _ = _ctx(args)
     ok, msg = audit.verify()
@@ -211,6 +323,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="Simulation-only secure device-disposal planner. "
                     "Performs NO destructive operations.")
     p.add_argument("--data-dir", help="override state directory")
+    p.add_argument("--config", help="path to a JSON config file")
+    p.add_argument("--verbose", action="store_true", help="echo structured logs")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def add_auth(sp):
@@ -251,6 +365,25 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--allow-external", nargs="*",
                    help="explicitly permit these external/network drive names")
     s.set_defaults(func=cmd_authorize)
+
+    s = sub.add_parser("privileges"); s.set_defaults(func=cmd_privileges)
+
+    s = sub.add_parser("execute", help="run the execution engine (dry-run by "
+                       "default) over the locked review's targets")
+    add_auth(s); add_inv(s)
+    s.add_argument("--adapter", default="simulation",
+                   choices=("simulation", "blkdiscard", "nvme-format",
+                            "ata-secure-erase", "luks-erase"))
+    s.add_argument("--verified", action="store_true")
+    s.add_argument("--real", action="store_true",
+                   help="request REAL execution (still gated by config + env "
+                        "DISPOSAL_ALLOW_REAL_EXECUTION=yes + typed serial)")
+    s.add_argument("--target-serial", help="expected serial of the target drive")
+    s.add_argument("--target-size", help="expected size of the target drive")
+    s.add_argument("--boot-drive", help="path of the OS boot drive (refused)")
+    s.add_argument("--allow-external", nargs="*",
+                   help="explicitly permit these external/network drive names")
+    s.set_defaults(func=cmd_execute)
 
     s = sub.add_parser("audit-verify"); s.set_defaults(func=cmd_audit_verify)
     return p
